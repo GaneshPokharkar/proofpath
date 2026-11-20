@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.embeddings import Embedder
 from app.ingest.base import JobPosting, Source
 from app.ingest.classify import classify_field, classify_level
+from app.ingest.deadline import find_apply_by
 from app.models import IngestionRun, Job, JobEmbedding
 
 log = logging.getLogger(__name__)
@@ -71,6 +72,7 @@ def _row(posting: JobPosting, source_key: str, now: datetime) -> dict:
         "last_seen_at": now,
         "content_hash": posting.content_hash(),
         "is_active": True,
+        "apply_by": posting.apply_by or find_apply_by(posting.description, posting.posted_at),
         "field": classify_field(posting.title),
         "level": classify_level(posting.title),
     }
@@ -133,6 +135,12 @@ def sync_postings(
     else:
         retire = retire.where(Job.last_seen_at < now - expire_after)
     stats.deactivated = session.execute(retire.values(is_active=False)).rowcount
+    # Jobs whose last date to apply has passed close even if the board still lists them.
+    stats.deactivated += session.execute(
+        update(Job)
+        .where(Job.source == source.key, Job.is_active.is_(True), Job.apply_by < now.date())
+        .values(is_active=False)
+    ).rowcount
 
     stats.embedded = _embed(session, to_embed, embedder)
     return stats

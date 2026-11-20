@@ -20,6 +20,13 @@ from app.ingest.base import (
     parse_iso,
 )
 
+
+def _date(value):
+    from app.ingest.deadline import find_apply_by
+
+    return find_apply_by("", field_value=value) if value else None
+
+
 REMOTIVE_URL = "https://remotive.com/api/remote-jobs"
 ARBEITNOW_URL = "https://www.arbeitnow.com/api/job-board-api"
 GREENHOUSE_URL = "https://boards-api.greenhouse.io/v1/boards/{board}/jobs"
@@ -124,6 +131,7 @@ def parse_greenhouse(payload: dict, board: str) -> list[JobPosting]:
                 remote=("remote" in location.lower()) if location else None,
                 tags=departments,
                 posted_at=parse_iso(item.get("first_published") or item.get("updated_at")),
+                apply_by=_date(item.get("application_deadline")),
             )
         )
     return jobs

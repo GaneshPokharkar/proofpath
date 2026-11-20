@@ -1,48 +1,52 @@
-# JobPilot
+# ProofPath
 
 An AI job-search agent. You describe the job you want in plain language; JobPilot searches a live,
 daily-refreshed index of real job postings and explains why each one fits.
 
-> **Status:** phase 1 of 5 is done: the jobs index and hybrid search. The Claude-powered chat agent,
-> automations (daily alerts, application tracker, resume tailoring), evals and the AWS deployment
-> follow. See [Roadmap](#roadmap).
+> **Live:** student web app (find jobs, skills a role needs, resume check with project ideas,
+> GitHub readiness), daily refresh, and a Telegram bot, on Vercel + Neon free tiers.
 
-## How it works (phase 1)
+## Architecture: fetch once, serve many
+
+ProofPath never searches job portals while a student is waiting. Job boards are read once a day,
+stored in Postgres, and every request after that is answered from the database.
 
 ```
- Public job APIs                    PostgreSQL 16 + pgvector
- ───────────────                    ─────────────────────────────────────────
- Remotive ─┐                        jobs            (tsvector column, GIN index)
- Arbeitnow ├─► ingest pipeline ───► job_embeddings  (384-d vectors, HNSW index)
- Greenhouse│   normalise, dedupe,   ingestion_runs  (audit trail per source)
- Lever ────┘   hash, embed changed            │
-                                              ▼
-                     FastAPI  /search ◄── hybrid search (full-text + vector, RRF)
+ once a day (Vercel Cron)                       every student request
+ ────────────────────────                       ─────────────────────
+ Greenhouse ─┐                                  /search ─► hybrid search over stored jobs
+ Lever ──────┤   ingest: normalise, dedupe,     /market ─► saved skill demand for the role,
+ Arbeitnow ──┼─► hash, embed changed jobs, ───►            or computed once and saved
+ Remotive ───┘   classify field + level,        /resume ─► saved demand + one resume read
+                 read last date to apply,       /readiness ─► saved demand + GitHub evidence
+                 retire closed + expired jobs
+                              │
+                     PostgreSQL + pgvector (Neon)
+       jobs · job_embeddings · job_skills · market_cache · ingestion_runs
 ```
 
-**Ingestion** (`app/ingest/`) pulls from four public job APIs, configured in [`sources.yaml`](sources.yaml):
-Remotive and Arbeitnow, plus company boards on Greenhouse (Groww, InMobi, Databricks, GitLab, Anthropic, ...)
-and Lever (CRED, Meesho, Zeta, Paytm, ...). Each posting is normalised to one shape, HTML is converted to
-text, and a SHA-256 content hash decides what changed, so only new or edited postings are re-embedded.
-Closed jobs are retired: immediately for full-snapshot boards, after 14 days unseen for partial feeds.
-Every source runs in its own transaction and writes an `ingestion_runs` row, so a broken board is recorded
-and reported without blocking the rest. An empty response from a board that had jobs is treated as an
-error rather than a reason to retire everything.
-
-**Embeddings** run locally with [fastembed](https://github.com/qdrant/fastembed) (BAAI/bge-small-en-v1.5,
-ONNX, CPU): no API key and no per-call cost.
-
-**Hybrid search** (`app/search.py`) runs two retrievers inside one SQL query and fuses them:
-
-| Retriever | Good at | Weak at |
+| What is stored | Computed | Reused until |
 | --- | --- | --- |
-| Postgres full-text (`ts_rank_cd`, title weighted highest) | exact terms: "Kubernetes", "FastAPI", company names | paraphrases |
-| pgvector cosine similarity (HNSW) | meaning: "backend intern" ≈ "software engineering internship, APIs" | exact rare terms |
+| Job postings, cleaned text, field and level | once per posting, at ingest | the posting changes (content hash) |
+| Embeddings (title and whole posting) | once per posting version | the posting changes |
+| Skills each posting asks for (LLM) | once per posting version | the posting changes |
+| Skill demand per role (`market_cache`) | first time any student asks for that role | the next successful refresh |
+| Last date to apply (`apply_by`) | at ingest, from a source field or the posting text | the date passes: hidden at once, retired at the next refresh |
 
-The two ranked lists are merged with **reciprocal rank fusion**, `score = Σ 1 / (60 + rank)`. RRF uses only
-ranks, so a text-rank score and a cosine distance never have to be put on the same scale. Chat-style queries
-are OR-ed rather than AND-ed, so "python backend intern remote" still matches jobs that contain most of
-those words. Filters (remote, location, company, recency, source) apply to both retrievers.
+So the second student who asks "what skills does a data analyst need?" gets the answer from the
+database with no new LLM calls, and no student ever sees a job whose last date to apply has passed.
+A daily refresh touches only new or changed postings (about 20 seconds after the first load).
+
+**Last date to apply.** Few boards publish a deadline field, so ProofPath also reads phrases such as
+"Application deadline: December 16, 2026" or "Last date to apply: 30/11/2026" from the posting text
+(`app/ingest/deadline.py`). Only dates that follow such a phrase count, and they must fall after the
+posting date. Jobs without a stated deadline show when the refresh last confirmed them open, and they
+are retired as soon as they disappear from the company's board.
+
+**Search.** Four ranked lists, fused with reciprocal rank fusion: full-text on the title, full-text on
+the whole posting, vector similarity on the title, vector similarity on the whole posting. Title-only
+lists stop long company boilerplate from drowning out what the job is. Filters (field, level, remote,
+location, company, recency) apply to all four.
 
 ## Run it
 

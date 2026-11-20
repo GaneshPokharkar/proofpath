@@ -31,7 +31,8 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 ignore = ["B008"]  # FastAPI's Depends()/Query() in defaults is the intended pattern
 
 [tool.ruff.lint.per-file-ignores]
-"app/ingest/classify.py" = ["E501"]  # one regex rule per line reads better than wrapped fragments
+"app/ingest/classify.py" = ["E501"]
+"app/ingest/deadline.py" = ["E501"]  # one regex rule per line reads better than wrapped fragments
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

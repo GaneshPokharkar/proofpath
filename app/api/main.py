@@ -3,7 +3,7 @@
 import hashlib
 import secrets
 import time
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -18,7 +18,7 @@ from app.config import get_settings
 from app.db import get_session
 from app.embeddings import Embedder, FastEmbedEmbedder
 from app.llm import StructuredLLM, build_llm
-from app.market.demand import market_read
+from app.market.demand import cached_market_read
 from app.models import IngestionRun, Job
 from app.search import SearchFilters, hybrid_search
 
@@ -65,6 +65,8 @@ class JobHit(BaseModel):
     semantic_rank: int | None
     field: str
     level: str
+    apply_by: date | None
+    last_seen_at: datetime | None
 
 
 class SearchResponse(BaseModel):
@@ -190,6 +192,8 @@ def search(
                 semantic_rank=h.semantic_rank,
                 field=h.field,
                 level=h.level,
+                apply_by=h.apply_by,
+                last_seen_at=h.last_seen_at,
             )
             for h in hits
         ],
@@ -266,6 +270,7 @@ class SkillDemandOut(BaseModel):
 class MarketResponse(BaseModel):
     role: str
     sample_size: int
+    cached: bool  # served from the saved result for this role, not recomputed
     skills: list[SkillDemandOut]
 
 
@@ -280,12 +285,13 @@ def market(
     sample: Annotated[int, Query(ge=5, le=60)] = 30,
 ) -> MarketResponse:
     """Skills that live postings for `role` ask for, ranked by how many postings ask."""
-    read = market_read(
+    read, cached = cached_market_read(
         session, llm, embedder, role, SearchFilters(remote=remote, location=location), sample=sample
     )
     return MarketResponse(
         role=read.role,
         sample_size=read.sample_size,
+        cached=cached,
         skills=[SkillDemandOut(**vars(s)) for s in read.skills],
     )
 
@@ -333,7 +339,7 @@ def readiness_endpoint(
             summary = analyze_student(session, GitHubClient(http, settings.github_token), embedder, github)
         except GitHubError as exc:
             raise HTTPException(502, str(exc)) from exc
-    read = market_read(session, llm, embedder, role, sample=sample)
+    read, _ = cached_market_read(session, llm, embedder, role, sample=sample)
     result = readiness(session, github, read)
     return ReadinessResponse(
         github=github,
@@ -459,7 +465,7 @@ async def telegram_webhook(request: Request) -> dict:
             embedder_factory=lambda: get_embedder(request),
             admins={a.strip().lstrip("@").lower() for a in s.telegram_admins.split(",") if a.strip()},
             refresh=lambda force: _refresh(request, force),
-            market=(lambda role: market_read(session, llm, get_embedder(request), role, sample=20))
+            market=(lambda role: cached_market_read(session, llm, get_embedder(request), role, sample=20)[0])
             if llm
             else None,
         )
@@ -560,7 +566,7 @@ async def resume_check(
         text = extract_text(resume.filename or "", data)
     except ResumeError as exc:
         raise HTTPException(422, str(exc)) from exc
-    read = market_read(session, llm, embedder, role, sample=20)
+    read, _ = cached_market_read(session, llm, embedder, role, sample=20)
     report = check_resume(llm, text, read)
     return ResumeResponse(
         role=report.role,

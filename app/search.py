@@ -9,7 +9,7 @@ ranks, so the two retrievers' incomparable scores never need to be calibrated:
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -45,11 +45,14 @@ class SearchHit:
     snippet: str
     field: str = "other"
     level: str = "mid"
+    apply_by: date | None = None
+    last_seen_at: datetime | None = None
 
 
 def _filter_sql(filters: SearchFilters, params: dict) -> str:
     """WHERE fragments for the jobs table aliased `j`. Values always go in as bound parameters."""
-    clauses = ["j.is_active"]
+    # Closed jobs never show: retired by the refresh, or past their last date to apply.
+    clauses = ["j.is_active", "(j.apply_by IS NULL OR j.apply_by >= CURRENT_DATE)"]
     if filters.remote is not None:
         clauses.append("j.remote = :f_remote")
         params["f_remote"] = filters.remote
@@ -161,7 +164,7 @@ def hybrid_search(
         )
         SELECT f.id, f.score, f.keyword_rank, f.semantic_rank,
                j.title, j.company, j.location, j.remote, j.url, j.source, j.posted_at,
-               j.field, j.level, left(j.description, 280) AS snippet
+               j.field, j.level, j.apply_by, j.last_seen_at, left(j.description, 280) AS snippet
         FROM fused f
         JOIN jobs j ON j.id = f.id
         ORDER BY f.score DESC, j.posted_at DESC NULLS LAST, f.id
@@ -187,6 +190,8 @@ def hybrid_search(
             snippet=" ".join(r.snippet.split()),
             field=r.field,
             level=r.level,
+            apply_by=r.apply_by,
+            last_seen_at=r.last_seen_at,
         )
         for r in rows
     ]

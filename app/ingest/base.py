@@ -3,7 +3,7 @@
 import hashlib
 import re
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Protocol
 
 import httpx
@@ -25,6 +25,7 @@ class JobPosting:
     tags: tuple[str, ...] = field(default_factory=tuple)
     salary_text: str | None = None
     posted_at: datetime | None = None
+    apply_by: date | None = None  # last date to apply, when the source gives it as a field
 
     def content_hash(self) -> str:
         """Stable hash of everything that affects search; a change means re-embed."""

@@ -70,6 +70,8 @@
   .opt:hover { border-color: var(--route); color: var(--route); }
   .opt[aria-checked="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
   .opt[aria-checked="true"] small { color: #C9D2E6; }
+  .due { color: var(--ink-2); font-weight: 600; }
+  .closing { color: var(--alert); font-weight: 700; }
   .lvl { display: inline-block; font-size: 13px; font-weight: 600; padding: 1px 9px; border-radius: 999px; background: var(--route-soft); color: var(--route); margin-left: 8px; vertical-align: 2px; }
   .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: var(--ink-2); cursor: pointer; padding: 0 10px; white-space: nowrap; border-left: 1px solid var(--line); }
   .toggle input { width: 18px; height: 18px; accent-color: var(--route); }
@@ -378,6 +380,17 @@ function ago(iso) {
   const d = Math.floor((Date.now() - new Date(iso)) / 86400000);
   return d <= 0 ? "Posted today" : d === 1 ? "Posted yesterday" : d < 30 ? `Posted ${d} days ago` : d < 60 ? "Posted a month ago" : d < 365 ? `Posted ${Math.floor(d / 30)} months ago` : "Posted over a year ago";
 }
+function deadline(j) {
+  if (j.apply_by) {
+    const days = Math.ceil((new Date(j.apply_by + "T23:59:59") - Date.now()) / 86400000);
+    const when = new Date(j.apply_by).toLocaleDateString("en-IN", {day: "numeric", month: "short", year: "numeric"});
+    return days <= 7 ? `<span class="closing">Closes ${days <= 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`} (apply by ${when})</span>`
+                     : `<span class="due">Apply by ${when}</span>`;
+  }
+  if (!j.last_seen_at) return "";
+  const d = Math.floor((Date.now() - new Date(j.last_seen_at)) / 86400000);
+  return `Still open, checked ${d <= 0 ? "today" : d === 1 ? "yesterday" : `${d} days ago`}`;
+}
 const board = (s) => s.startsWith("greenhouse:") ? "Greenhouse" : s.startsWith("lever:") ? "Lever" : s === "remotive" ? "Remotive" : s === "arbeitnow" ? "Arbeitnow" : s;
 const tints = [["#E8EEFC", "#2952CC"], ["#E3F4EC", "#17855A"], ["#FFF3C2", "#8A6A00"], ["#F3E8FC", "#7A3DB8"], ["#FCEDE6", "#B4461B"]];
 const tint = (name) => tints[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % tints.length];
@@ -405,7 +418,7 @@ $("jobs-form").addEventListener("submit", (e) => {
           <div class="avatar" style="background:${bg};color:${fg}" aria-hidden="true">${esc(j.company.trim()[0] || "?")}</div>
           <div><h3>${esc(j.title)}${j.remote ? '<span class="pill">Remote</span>' : ""}${j.level === "intern" ? '<span class="lvl">Internship</span>' : j.level === "entry" ? '<span class="lvl">Entry level</span>' : ""}</h3>
             <div class="where"><b>${esc(j.company)}</b>${j.location ? `, ${esc(j.location)}` : ""}</div>
-            <div class="where">${ago(j.posted_at)}</div>
+            <div class="where">${ago(j.posted_at)}${j.posted_at ? ". " : ""}${deadline(j)}</div>
             <p>${esc(j.snippet)}</p></div>
           <a class="apply" href="${esc(j.url)}" target="_blank" rel="noopener">Apply<small>on ${esc(board(j.source))}</small></a>
         </article>`; }).join("");
@@ -422,7 +435,7 @@ $("skills-form").addEventListener("submit", (e) => {
     try {
       const d = await getJSON(`/market?${new URLSearchParams({role, sample: 20})}`);
       if (!d.skills.length) return fail(out, "Not enough postings for that role yet. Try a more common name for it.");
-      out.innerHTML = `<p class="count" style="margin-top:20px">Counted across ${d.sample_size} live postings for “${esc(role)}”</p>
+      out.innerHTML = `<p class="count" style="margin-top:20px">Counted across ${d.sample_size} live postings for “${esc(role)}”${d.cached ? ". Saved result, up to date with today's jobs" : ""}</p>
         <div class="skills">${d.skills.slice(0, 15).map(s => `
           <div class="skill"><span class="name">${esc(s.skill)}</span>
             <span class="track" role="img" aria-label="${pct(s.share)} percent of postings"><span class="fill" style="width:${pct(s.share)}%"></span></span>

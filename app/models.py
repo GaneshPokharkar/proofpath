@@ -4,13 +4,14 @@ jobs.search_tsv and jobs.title_tsv (generated tsvector columns with GIN indexes)
 in the migration: they are read through raw SQL in app/search.py, never written by the ORM.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     ARRAY,
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -53,6 +54,8 @@ class Job(Base):
     # Classified from the title (app/ingest/classify.py): e.g. "software", "data_ai"; "intern", "entry".
     field: Mapped[str] = mapped_column(String(16), nullable=False, server_default="other")
     level: Mapped[str] = mapped_column(String(8), nullable=False, server_default="mid")
+    # Last date to apply, if the source states it (app/ingest/deadline.py).
+    apply_by: Mapped[date | None] = mapped_column(Date)
 
 
 class JobEmbedding(Base):
