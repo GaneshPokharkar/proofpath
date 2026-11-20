@@ -53,7 +53,7 @@ class HashingEmbedder:
     def _vector(self, text: str) -> list[float]:
         vec = [0.0] * EMBEDDING_DIM
         for token in _TOKEN.findall(text.lower()):
-            bucket = int(hashlib.md5(token.encode()).hexdigest(), 16) % EMBEDDING_DIM
+            bucket = int(hashlib.md5(token.encode(), usedforsecurity=False).hexdigest(), 16) % EMBEDDING_DIM
             vec[bucket] += 1.0
         norm = math.sqrt(sum(x * x for x in vec))
         if norm == 0.0:

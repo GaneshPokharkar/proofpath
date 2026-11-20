@@ -199,6 +199,17 @@ def fields(session: SessionDep) -> dict:
     }
 
 
+@app.get("/version")
+def version() -> dict:
+    """Which commit is live. The deploy pipeline waits for this to match before smoke testing."""
+    import os
+
+    return {
+        "commit": os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("GIT_COMMIT", "dev"),
+        "env": os.environ.get("VERCEL_ENV", "local"),
+    }
+
+
 @app.get("/health")
 def health(session: SessionDep) -> dict:
     session.execute(text("SELECT 1"))

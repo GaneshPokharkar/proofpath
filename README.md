@@ -114,6 +114,12 @@ times a day, and not use its jobs to collect signups, so Remotive jobs are exclu
 - Visitors' Gemini keys stay in their own browser and travel only with their own requests.
 - The daily cron runs `app/retention.py`, which deletes everything older than 24 hours: GitHub checks, saved skill reports, Telegram subscriptions, old refresh logs, and job postings no longer seen. Postings are only cleared after a successful refresh, so a failed scrape never empties the site.
 
+## From development to production
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): local setup (`make setup db run`), the CI
+checks every pull request must pass (`make check` runs the same locally), Vercel preview and
+production deploys, post-deploy smoke tests, migrations, nightly checks and rollback.
+
 ## Chat agent (Ask ProofPath)
 
 `POST /chat` runs one turn of an LLM agent (Gemini function calling) over six tools in

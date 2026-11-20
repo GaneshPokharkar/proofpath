@@ -46,3 +46,9 @@ ignore = ["B008"]  # FastAPI's Depends()/Query() in defaults is the intended pat
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning:starlette.*", "ignore:Using `httpx` with `starlette.testclient`"]
+
+[tool.bandit]
+# B608: the only f-string SQL joins constant fragments (filter clauses, the dedupe expression);
+# every user value goes in as a bound parameter, and tests cover the filters.
+skips = ["B608"]
+exclude_dirs = ["tests", ".venv"]
