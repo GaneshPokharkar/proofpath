@@ -214,6 +214,9 @@ def tailor(
             Checked(r.section, r.entry, r.bullet, original, r.text.strip(), reason is None, reason or "")
         )
 
+    summary_reason = rule_check(rw.summary, clean, job_skills) if rw.summary else "empty"
+    if summary_reason is None:  # the new summary is fact-checked like any bullet
+        candidates.append(Checked("summary", 0, 0, doc.summary, rw.summary.strip(), True))
     to_judge = [c for c in candidates if c.accepted]
     if to_judge:
         listing = "\n".join(f"{i}. {c.rewrite}" for i, c in enumerate(to_judge))
@@ -227,13 +230,11 @@ def tailor(
                 c.accepted, c.reason = False, (v.reason if v else "the verifier gave no verdict")
 
     for c in candidates:
-        if c.accepted:
+        if c.accepted and c.section == "summary":
+            doc.summary = c.rewrite
+        elif c.accepted:
             entries = doc.experience if c.section == "experience" else doc.projects
             entries[c.entry].bullets[c.bullet] = c.rewrite
-
-    summary_reason = rule_check(rw.summary, clean, job_skills)
-    if rw.summary and summary_reason is None:
-        doc.summary = rw.summary
     if rw.skills_first:
         first = {s.lower() for s in rw.skills_first if s.lower() in clean.lower()}
         for g in doc.skills:

@@ -166,3 +166,9 @@ def test_build_pdf_reports_compile_errors():
     )
     t = build_pdf(t, "https://latex.example/build", client=client)
     assert t.pdf is None and "Undefined control sequence" in t.compile_error and t.tex
+
+
+def test_summary_is_fact_checked_too():
+    t = tailor(FakeLLM(), RESUME, "Data Analyst", "SQL", ["SQL", "Python", "Tableau"])
+    summary = next(c for c in t.checked if c.section == "summary")
+    assert not summary.accepted and t.doc.summary == ""
