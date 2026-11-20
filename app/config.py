@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,7 +10,17 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="JOBPILOT_", extra="ignore")
 
     # Required: there is deliberately no default, so a missing database URL fails loudly at startup.
-    database_url: str
+    # DATABASE_URL is what Vercel's Neon integration sets; JOBPILOT_DATABASE_URL wins if both exist.
+    database_url: str = Field(validation_alias=AliasChoices("JOBPILOT_DATABASE_URL", "DATABASE_URL"))
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_psycopg3(cls, url: str) -> str:
+        # Hosted Postgres hands out postgres:// or postgresql:// URLs; SQLAlchemy needs the driver named.
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url[len(prefix) :]
+        return url
 
     # Must produce vectors of app.models.EMBEDDING_DIM dimensions (384 for bge-small).
     embedding_model: str = "BAAI/bge-small-en-v1.5"

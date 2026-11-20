@@ -86,3 +86,13 @@ def test_registry_rejects_unknown_source(tmp_path):
     bad.write_text("linkedin: [foo]\n")
     with pytest.raises(ValueError, match="unknown source types"):
         load_sources(bad)
+
+
+def test_database_url_accepts_hosted_formats(monkeypatch):
+    from app.config import Settings
+
+    monkeypatch.delenv("JOBPILOT_DATABASE_URL", raising=False)
+    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@host.neon.tech/db?sslmode=require")
+    assert (
+        Settings(_env_file=None).database_url == "postgresql+psycopg://u:p@host.neon.tech/db?sslmode=require"
+    )
