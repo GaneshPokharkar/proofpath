@@ -50,7 +50,7 @@ those words. Filters (remote, location, company, recency, source) apply to both 
 
 ```bash
 docker compose up --build -d
-docker compose run --rm ingest          # fetch jobs from every source (first load takes ~10 min)
+docker compose run --rm ingest          # fetch jobs from every source (first load ~20 min on 2 CPUs; later runs ~20 s)
 curl "localhost:8000/search?q=python+backend+intern&remote=true"
 ```
 
