@@ -26,27 +26,12 @@ from app.search import SearchFilters, hybrid_search
 
 @asynccontextmanager
 async def _lifespan(_app):
-    # Apply the small additive schema step 0007 on start, so a deploy never runs ahead of the database.
-    try:
-        from app.db import get_engine
+    # Apply the small additive schema steps on start, so a deploy never runs ahead of the database.
+    from app.db import get_engine
+    from app.schema_live import ensure_schema
 
-        with get_engine().begin() as conn:
-            conn.execute(text("SET LOCAL lock_timeout = '3s'"))
-            conn.execute(text("SET LOCAL statement_timeout = '60s'"))
-            conn.execute(text("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS last_served_at TIMESTAMPTZ"))
-            from app.models import DEDUPE_SQL
-
-            conn.execute(
-                text(
-                    f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS dedupe_key TEXT GENERATED ALWAYS AS ({DEDUPE_SQL}) STORED"
-                )
-            )
-            conn.execute(text("CREATE INDEX IF NOT EXISTS jobs_dedupe_key ON jobs (dedupe_key)"))
-            conn.execute(
-                text("UPDATE alembic_version SET version_num = '0008' WHERE version_num IN ('0006', '0007')")
-            )
-    except Exception:  # noqa: BLE001 - never block start-up; search reports its own errors
-        pass
+    with suppress(Exception):  # never block start-up; each step reports through its own endpoint
+        ensure_schema(get_engine())
     # Connect the Telegram bot by itself once its token is in Vercel: no admin step needed.
     import os
 

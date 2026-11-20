@@ -23,3 +23,59 @@ STEP_0009 = [
         PRIMARY KEY (day, event)
     )""",
 ]
+
+
+def ensure_schema(engine) -> list[str]:
+    """Bring the live database up to migration 0009. Each step runs in its own transaction and
+    only when it is missing, so an existing table never gets locked on a cold start."""
+    from sqlalchemy import text
+
+    from app.models import DEDUPE_SQL
+
+    def has_column(conn, col: str) -> bool:
+        return bool(
+            conn.execute(
+                text(
+                    "SELECT 1 FROM information_schema.columns WHERE table_name = 'jobs' AND column_name = :c"
+                ),
+                {"c": col},
+            ).first()
+        )
+
+    done = []
+    steps = [
+        (
+            "last_served_at",
+            lambda c: not has_column(c, "last_served_at"),
+            ["ALTER TABLE jobs ADD COLUMN IF NOT EXISTS last_served_at TIMESTAMPTZ"],
+        ),
+        (
+            "dedupe_key",
+            lambda c: not has_column(c, "dedupe_key"),
+            [
+                f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS dedupe_key TEXT GENERATED ALWAYS AS ({DEDUPE_SQL}) STORED",
+                "CREATE INDEX IF NOT EXISTS jobs_dedupe_key ON jobs (dedupe_key)",
+            ],
+        ),
+        (
+            "0009",
+            lambda c: c.execute(
+                text("SELECT to_regclass('agent_sessions') IS NULL OR to_regclass('usage_daily') IS NULL")
+            ).scalar(),
+            STEP_0009,
+        ),
+    ]
+    for name, needed, sqls in steps:
+        with engine.begin() as conn:
+            conn.execute(text("SET LOCAL lock_timeout = '5s'"))
+            if needed(conn):
+                for sql in sqls:
+                    conn.execute(text(sql))
+                done.append(name)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE alembic_version SET version_num = '0009' WHERE version_num IN ('0006', '0007', '0008')"
+            )
+        )
+    return done
