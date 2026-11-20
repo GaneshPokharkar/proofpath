@@ -58,7 +58,8 @@ flowchart LR
 |---|---|---|
 | `ci.yml` | every PR and push to main | Lint and format (ruff); dependency CVEs (pip-audit), static security scan (bandit), committed secrets (gitleaks); 123 tests against real Postgres + pgvector with ≥80% coverage; migrations up, down and up again on an empty database; page scripts parse; Docker image builds and the stack answers `/health`. One summary job, `ci-passed`, is what branch protection requires. On main it then runs `alembic upgrade head` against production (when `PRODUCTION_DATABASE_URL` is set). |
 | `evals.yml` | changes to the agent, prompts, model settings, search or evals | 100 fixed cases against the real model: tool-choice accuracy, filter extraction, hallucinated-job rate. Below `evals/thresholds.json` the check fails. |
-| `deploy.yml` | every Vercel deployment that goes live (preview and production) | Waits until `/version` reports the new commit, then `scripts/smoke.py` checks health, the page, India search, filters, job details, stats, chat memory and that admin routes stay locked. |
+| `ci.yml` → `verify-production` | after every merge to main | Waits until production's `/version` reports the merged commit, then `scripts/smoke.py` checks health, the page, India search, filters, job details, stats, chat memory and that admin routes stay locked. |
+| `deploy.yml` | every Vercel preview deployment GitHub hears about | The same smoke test against the preview URL. |
 | `nightly.yml` | 02:47 IST daily | Production smoke test, new CVEs in pinned dependencies, and whether each job-board API still parses. |
 | Dependabot | weekly | Grouped dependency update PRs, which go through all of the above. |
 

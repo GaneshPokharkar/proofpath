@@ -133,3 +133,17 @@ jobs:
           fi
       - if: steps.secret.outputs.missing != 'true'
         run: pip install -r requirements.txt && alembic upgrade head
+
+  verify-production:
+    # After a merge, Vercel builds and promotes production. Wait until the live site reports this
+    # commit, then run the smoke test against it. A failure here means: roll back in Vercel.
+    runs-on: ubuntu-latest
+    needs: [ci-passed, migrate]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - run: pip install httpx==0.28.1
+      - name: Smoke test production at this commit
+        run: python scripts/smoke.py https://proofpath-ganeshpokharkars-projects.vercel.app --commit "${{ github.sha }}" --wait 900

@@ -1,8 +1,9 @@
 name: Deploy checks
 
-# Vercel builds a preview for every pull request and production for every push to main, and
-# reports each one back to GitHub as a deployment. When a deployment goes live, this smoke-tests
-# that exact URL and commit. A failed production check is a red X on the commit and an email.
+# Vercel builds a preview for every pull request and reports it to GitHub as a deployment.
+# When one goes live, this smoke-tests that exact URL and commit. (Production is verified by the
+# "verify-production" job in ci.yml, which runs after every merge to main.) GitHub also creates
+# deployment events for the workflows' own environments; those are skipped by the URL check.
 on:
   deployment_status:
 
@@ -12,7 +13,9 @@ permissions:
 
 jobs:
   smoke:
-    if: github.event.deployment_status.state == 'success'
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      contains(github.event.deployment_status.environment_url || github.event.deployment_status.target_url, '.vercel.app')
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.event.deployment.environment }}
