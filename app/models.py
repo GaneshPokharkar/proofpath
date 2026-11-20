@@ -50,6 +50,7 @@ class Job(Base):
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    last_served_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     # Classified from the title (app/ingest/classify.py): e.g. "software", "data_ai"; "intern", "entry".
     field: Mapped[str] = mapped_column(String(16), nullable=False, server_default="other")

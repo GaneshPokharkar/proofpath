@@ -3,6 +3,7 @@
 import hashlib
 import secrets
 import time
+from contextlib import asynccontextmanager
 from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated
@@ -22,7 +23,23 @@ from app.market.demand import cached_market_read
 from app.models import IngestionRun, Job
 from app.search import SearchFilters, hybrid_search
 
-app = FastAPI(title="ProofPath", version="0.2.0")
+
+@asynccontextmanager
+async def _lifespan(_app):
+    # Apply the small additive schema step 0007 on start, so a deploy never runs ahead of the database.
+    try:
+        from app.db import get_engine
+
+        with get_engine().begin() as conn:
+            conn.execute(text("SET LOCAL lock_timeout = '3s'"))
+            conn.execute(text("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS last_served_at TIMESTAMPTZ"))
+            conn.execute(text("UPDATE alembic_version SET version_num = '0007' WHERE version_num = '0006'"))
+    except Exception:  # noqa: BLE001 - never block start-up; search reports its own errors
+        pass
+    yield
+
+
+app = FastAPI(title="ProofPath", version="0.2.0", lifespan=_lifespan)
 
 SessionDep = Annotated[Session, Depends(get_session)]
 

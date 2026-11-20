@@ -69,7 +69,7 @@ def test_deadline_stored_and_expired_jobs_hidden_and_retired(session, embedder):
     assert session.scalar(select(Job.is_active).where(Job.external_id == "d2")) is False
 
 
-def test_market_read_served_from_database_until_next_refresh(session, embedder):
+def test_market_read_served_from_database_for_a_week(session, embedder):
     jobs = [
         posting("m1", "Backend Intern", "Python, FastAPI and Postgres."),
         posting("m2", "Backend Engineer", "Python and Kubernetes."),
@@ -93,7 +93,7 @@ def test_market_read_served_from_database_until_next_refresh(session, embedder):
     assert [s.skill for s in second.skills] == [s.skill for s in first.skills]
     assert session.scalar(text("SELECT hits FROM market_cache")) == 1
 
-    # A newer successful refresh makes the saved answer stale, so it is rebuilt once.
+    # A newer refresh does not throw the report away: it is reused for 7 days.
     session.add(
         IngestionRun(
             source="x",
@@ -104,4 +104,7 @@ def test_market_read_served_from_database_until_next_refresh(session, embedder):
     )
     session.flush()
     _, cached3 = cached_market_read(session, llm, embedder, "backend engineer", sample=5)
-    assert cached3 is False
+    assert cached3 is True
+    session.execute(text("UPDATE market_cache SET built_at = now() - interval '8 days'"))
+    _, cached4 = cached_market_read(session, llm, embedder, "backend engineer", sample=5)
+    assert cached4 is False

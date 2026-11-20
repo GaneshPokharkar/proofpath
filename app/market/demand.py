@@ -85,7 +85,7 @@ def cached_market_read(
     sample: int = 30,
 ) -> tuple[MarketRead, bool]:
     """market_read, computed once per role and served from the database to every later request
-    until the next successful job refresh changes the underlying postings.
+    for 7 days, so a visitor's own API key is spent only by the first person to ask for a role.
 
     Returns (read, from_cache)."""
     key = _cache_key(role, filters, sample)
@@ -93,8 +93,7 @@ def cached_market_read(
         text(
             """
             SELECT payload FROM market_cache
-            WHERE key = :k AND built_at >= COALESCE(
-                (SELECT max(finished_at) FROM ingestion_runs WHERE status = 'success'), '-infinity')
+            WHERE key = :k AND built_at >= now() - interval '7 days'
             """
         ),
         {"k": key},

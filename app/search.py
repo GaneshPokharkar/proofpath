@@ -174,6 +174,10 @@ def hybrid_search(
     # More HNSW candidates than the default 40, so filtered vector queries still fill `candidates`.
     session.execute(text("SET LOCAL hnsw.ef_search = 200"))
     rows = session.execute(sql, params).all()
+    if rows:  # these jobs were searched: keep them (see app/retention.py)
+        session.execute(
+            text("UPDATE jobs SET last_served_at = now() WHERE id = ANY(:ids)"), {"ids": [r.id for r in rows]}
+        )
     return [
         SearchHit(
             job_id=r.id,
