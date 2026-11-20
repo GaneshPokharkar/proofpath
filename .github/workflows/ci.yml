@@ -68,7 +68,7 @@ jobs:
           JOBPILOT_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/migrate_check alembic upgrade head
           JOBPILOT_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/migrate_check alembic downgrade 0006
           JOBPILOT_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/migrate_check alembic upgrade head
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with: { name: coverage, path: coverage.xml }
 
