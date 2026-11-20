@@ -1,0 +1,30 @@
+# Which job sources JobPilot ingests. Edit this file to add or remove companies.
+# Greenhouse board tokens and Lever company slugs come from each company's careers-page URL,
+# e.g. boards.greenhouse.io/groww -> groww, jobs.lever.co/meesho -> meesho.
+
+remotive:
+  enabled: true        # remote jobs; Remotive asks for at most 4 fetches a day
+
+arbeitnow:
+  enabled: true
+  max_pages: 3         # 100 jobs per page
+
+greenhouse:
+  - groww
+  - inmobi
+  - databricks
+  - gitlab
+  - anthropic
+  - cloudflare
+  - elastic
+  - mongodb
+  - airbnb
+  - figma
+
+lever:
+  - {slug: cred, name: CRED}
+  - {slug: meesho, name: Meesho}
+  - {slug: zeta, name: Zeta}
+  - {slug: paytm, name: Paytm}
+  - {slug: palantir, name: Palantir}
+  - {slug: spotify, name: Spotify}

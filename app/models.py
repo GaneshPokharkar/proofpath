@@ -1,0 +1,89 @@
+"""ORM models. The schema itself is owned by Alembic migrations in migrations/versions.
+
+jobs.search_tsv and jobs.title_tsv (generated tsvector columns with GIN indexes) exist only
+in the migration: they are read through raw SQL in app/search.py, never written by the ORM.
+"""
+
+from datetime import datetime
+
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import (
+    ARRAY,
+    BigInteger,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+EMBEDDING_DIM = 384
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class Job(Base):
+    __tablename__ = "jobs"
+    __table_args__ = (UniqueConstraint("source", "external_id", name="uq_jobs_source_external_id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # Source key, e.g. "remotive", "arbeitnow", "greenhouse:groww", "lever:meesho".
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    external_id: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    company: Mapped[str] = mapped_column(Text, nullable=False)
+    location: Mapped[str | None] = mapped_column(Text)
+    remote: Mapped[bool | None] = mapped_column(Boolean)
+    employment_type: Mapped[str | None] = mapped_column(Text)
+    tags: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, server_default="{}")
+    salary_text: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+
+
+class JobEmbedding(Base):
+    __tablename__ = "job_embeddings"
+
+    job_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("jobs.id", ondelete="CASCADE"), primary_key=True
+    )
+    model: Mapped[str] = mapped_column(Text, nullable=False)
+    # Hash of the job content this vector was computed from; lets ingestion skip unchanged jobs.
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Whole posting (title, company, location, tags, start of description).
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM), nullable=False)
+    # Title alone, so "what the job is" can be matched without description noise.
+    title_embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class IngestionRun(Base):
+    """One row per source per ingestion run: the audit trail and the data behind ingestion monitoring."""
+
+    __tablename__ = "ingestion_runs"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(16), nullable=False)  # running | success | failed
+    fetched: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    inserted: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    updated: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    unchanged: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    deactivated: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    embedded: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    error: Mapped[str | None] = mapped_column(Text)

@@ -1,0 +1,196 @@
+"""HTTP API. Phase 1 exposes search; the chat agent arrives in phase 2."""
+
+import time
+from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from pydantic import BaseModel
+from sqlalchemy import func, select, text
+from sqlalchemy.dialects.postgresql import distinct_on
+from sqlalchemy.orm import Session
+
+from app.config import get_settings
+from app.db import get_session
+from app.embeddings import Embedder, FastEmbedEmbedder
+from app.models import IngestionRun, Job
+from app.search import SearchFilters, hybrid_search
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Tests inject their own embedder before startup; production loads the real model once.
+    if not hasattr(app.state, "embedder"):
+        app.state.embedder = FastEmbedEmbedder(get_settings().embedding_model)
+    yield
+
+
+app = FastAPI(title="JobPilot", version="0.1.0", lifespan=lifespan)
+
+SessionDep = Annotated[Session, Depends(get_session)]
+
+
+def get_embedder(request: Request) -> Embedder:
+    return request.app.state.embedder
+
+
+EmbedderDep = Annotated[Embedder, Depends(get_embedder)]
+
+
+class JobHit(BaseModel):
+    id: int
+    title: str
+    company: str
+    location: str | None
+    remote: bool | None
+    url: str
+    source: str
+    posted_at: datetime | None
+    snippet: str
+    score: float
+    keyword_rank: int | None
+    semantic_rank: int | None
+
+
+class SearchResponse(BaseModel):
+    query: str
+    count: int
+    took_ms: float
+    results: list[JobHit]
+
+
+class JobDetail(BaseModel):
+    id: int
+    title: str
+    company: str
+    location: str | None
+    remote: bool | None
+    employment_type: str | None
+    tags: list[str]
+    salary_text: str | None
+    description: str
+    url: str
+    source: str
+    posted_at: datetime | None
+    is_active: bool
+
+
+@app.get("/health")
+def health(session: SessionDep) -> dict:
+    session.execute(text("SELECT 1"))
+    return {"status": "ok"}
+
+
+@app.get("/search", response_model=SearchResponse)
+def search(
+    session: SessionDep,
+    embedder: EmbedderDep,
+    q: Annotated[str, Query(min_length=1, max_length=300)],
+    remote: bool | None = None,
+    location: str | None = None,
+    company: str | None = None,
+    posted_within_days: Annotated[int | None, Query(ge=1, le=365)] = None,
+    source: Annotated[list[str] | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> SearchResponse:
+    settings = get_settings()
+    filters = SearchFilters(
+        remote=remote,
+        location=location,
+        company=company,
+        posted_within_days=posted_within_days,
+        sources=tuple(source) if source else None,
+    )
+    start = time.perf_counter()
+    hits = hybrid_search(
+        session,
+        embedder,
+        q,
+        filters,
+        limit=limit,
+        candidates=settings.search_candidates,
+        rrf_k=settings.rrf_k,
+    )
+    took_ms = (time.perf_counter() - start) * 1000
+    return SearchResponse(
+        query=q,
+        count=len(hits),
+        took_ms=round(took_ms, 1),
+        results=[
+            JobHit(
+                id=h.job_id,
+                title=h.title,
+                company=h.company,
+                location=h.location,
+                remote=h.remote,
+                url=h.url,
+                source=h.source,
+                posted_at=h.posted_at,
+                snippet=h.snippet,
+                score=round(h.score, 5),
+                keyword_rank=h.keyword_rank,
+                semantic_rank=h.semantic_rank,
+            )
+            for h in hits
+        ],
+    )
+
+
+@app.get("/jobs/{job_id}", response_model=JobDetail)
+def get_job(job_id: int, session: SessionDep) -> JobDetail:
+    job = session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"job {job_id} not found")
+    return JobDetail(
+        id=job.id,
+        title=job.title,
+        company=job.company,
+        location=job.location,
+        remote=job.remote,
+        employment_type=job.employment_type,
+        tags=job.tags,
+        salary_text=job.salary_text,
+        description=job.description,
+        url=job.url,
+        source=job.source,
+        posted_at=job.posted_at,
+        is_active=job.is_active,
+    )
+
+
+@app.get("/stats")
+def stats(session: SessionDep) -> dict:
+    """Index size per source and each source's latest ingestion run."""
+    per_source = session.execute(
+        select(Job.source, func.count().filter(Job.is_active), func.count())
+        .group_by(Job.source)
+        .order_by(Job.source)
+    ).all()
+    latest = (
+        select(IngestionRun)
+        .ext(distinct_on(IngestionRun.source))
+        .order_by(IngestionRun.source, IngestionRun.started_at.desc())
+    )
+    runs = {r.source: r for r in session.scalars(latest)}
+    return {
+        "active_jobs": sum(active for _, active, _ in per_source),
+        "sources": [
+            {
+                "source": src,
+                "active": active,
+                "total": total,
+                "last_run": {
+                    "status": runs[src].status,
+                    "started_at": runs[src].started_at,
+                    "inserted": runs[src].inserted,
+                    "updated": runs[src].updated,
+                    "deactivated": runs[src].deactivated,
+                    "error": runs[src].error,
+                }
+                if src in runs
+                else None,
+            }
+            for src, active, total in per_source
+        ],
+    }

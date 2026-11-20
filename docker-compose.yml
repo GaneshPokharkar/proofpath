@@ -1,0 +1,51 @@
+# Local stack: Postgres + pgvector, a one-off migration job, and the API.
+#   docker compose up --build             start everything
+#   docker compose run --rm ingest        fetch jobs from every source
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: jobpilot
+      POSTGRES_PASSWORD: jobpilot
+      POSTGRES_DB: jobpilot
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobpilot -d jobpilot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      JOBPILOT_DATABASE_URL: postgresql+psycopg://jobpilot:jobpilot@db:5432/jobpilot
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build: .
+    environment:
+      JOBPILOT_DATABASE_URL: postgresql+psycopg://jobpilot:jobpilot@db:5432/jobpilot
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  ingest:
+    build: .
+    command: ["python", "-m", "app.cli", "ingest"]
+    environment:
+      JOBPILOT_DATABASE_URL: postgresql+psycopg://jobpilot:jobpilot@db:5432/jobpilot
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    profiles: ["jobs"]
+
+volumes:
+  pgdata:
