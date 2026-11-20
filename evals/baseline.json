@@ -1,0 +1,18 @@
+{
+ "cases": 100,
+ "tool_choice_accuracy": 0.99,
+ "filter_extraction_accuracy": 0.94,
+ "argument_accuracy_all": 0.96,
+ "hallucinated_job_rate": 0.0,
+ "errors": 1,
+ "by_tag": {
+  "chitchat": 1.0,
+  "compare": 1.0,
+  "details": 1.0,
+  "explain": 1.0,
+  "preference": 1.0,
+  "search": 0.98,
+  "shortlist": 1.0
+ },
+ "model": "gemini-flash-lite-latest"
+}

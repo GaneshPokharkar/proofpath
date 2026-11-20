@@ -111,9 +111,14 @@ class GeminiLLM:
 
     def _post(self, body: dict) -> dict:
         for attempt in range(self._max_retries + 1):
-            r = self._client.post(
-                GEMINI_URL.format(model=self.model_name), json=body, headers={"x-goog-api-key": self._key}
-            )
+            try:
+                r = self._client.post(
+                    GEMINI_URL.format(model=self.model_name), json=body, headers={"x-goog-api-key": self._key}
+                )
+            except httpx.TimeoutException:
+                if attempt < self._max_retries:
+                    continue  # a slow free-tier answer: ask again
+                raise LLMError("Gemini timed out") from None
             # Free-tier rate limits (429) and transient overloads (503) are retried with backoff.
             if r.status_code in (429, 503) and attempt < self._max_retries:
                 time.sleep(min(60, 2 ** (attempt + 2)))

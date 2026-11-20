@@ -136,6 +136,9 @@ details, small talk) run against `evals/jobs.json`, a snapshot of 173 real posti
 rate, and exits non-zero below `evals/thresholds.json`. `.github/workflows/evals.yml` runs it on
 every change to the agent, prompts, model settings or evals (add a `GEMINI_API_KEY` repo secret).
 
+First full run (gemini-flash-lite-latest, 2026-11-20, `evals/baseline.json`): tool-choice accuracy
+0.99, filter-extraction accuracy 0.94, hallucinated-job rate 0.0 (no invented job ids), 1 timeout.
+
 ## Resume tailoring (ResumeForge)
 
 `POST /resume/tailor` parses the resume into validated JSON, rewrites bullets for one posting,
