@@ -81,11 +81,17 @@ def _inline_refs(schema: dict) -> dict:
     """Gemini's response schema does not follow $ref/$defs, so expand them in place."""
     defs = schema.pop("$defs", {})
 
-    def expand(node):
+    def expand(node, in_properties: bool = False):
         if isinstance(node, dict):
             if "$ref" in node:
                 return expand(dict(defs[node["$ref"].split("/")[-1]]))
-            return {k: expand(v) for k, v in node.items() if k != "title"}
+            # "title" is a schema annotation to drop, except under "properties", where it is a
+            # field name (e.g. a project's title) that must stay.
+            return {
+                k: expand(v, in_properties=(k == "properties"))
+                for k, v in node.items()
+                if in_properties or k != "title"
+            }
         if isinstance(node, list):
             return [expand(v) for v in node]
         return node

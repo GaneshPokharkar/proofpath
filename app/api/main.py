@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select, text
@@ -461,3 +461,65 @@ def home() -> str:
 @app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
 def admin_page() -> str:
     return (_WEB / "admin.html").read_text()
+
+
+# --- Resume check ------------------------------------------------------------------------
+
+MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+
+
+class SkillMatchOut(BaseModel):
+    skill: str
+    demand_share: float
+    required: int
+    status: str
+
+
+class ProjectOut(BaseModel):
+    title: str
+    pitch: str
+    skills: list[str]
+    steps: list[str]
+    done_when: str
+    weeks: int
+    resume_bullet: str
+
+
+class ResumeResponse(BaseModel):
+    role: str
+    sample_size: int
+    level: str
+    score: float
+    skills: list[SkillMatchOut]
+    projects: list[ProjectOut]
+
+
+@app.post("/resume/check", response_model=ResumeResponse)
+async def resume_check(
+    session: SessionDep,
+    embedder: EmbedderDep,
+    llm: LLMDep,
+    resume: Annotated[UploadFile, File()],
+    role: Annotated[str, Form(min_length=2, max_length=120)],
+) -> ResumeResponse:
+    """Which in-demand skills a resume shows for a role, and projects that would fill the gaps.
+    The file is read in memory and never stored; contact details are removed before the LLM."""
+    from app.resume.check import ResumeError, check_resume, extract_text
+
+    data = await resume.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "That file is over 2 MB. Upload a smaller PDF.")
+    try:
+        text = extract_text(resume.filename or "", data)
+    except ResumeError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    read = market_read(session, llm, embedder, role, sample=20)
+    report = check_resume(llm, text, read)
+    return ResumeResponse(
+        role=report.role,
+        sample_size=report.sample_size,
+        level=report.level,
+        score=report.score,
+        skills=[SkillMatchOut(**vars(s)) for s in report.skills],
+        projects=[ProjectOut(**p.model_dump()) for p in report.projects],
+    )

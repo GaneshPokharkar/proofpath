@@ -66,8 +66,8 @@
   .toggle input { width: 18px; height: 18px; accent-color: var(--route); }
 
   /* The route: three stops that switch tools */
-  .route { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 46px 0 22px; }
-  .route::before { content: ""; position: absolute; left: 22px; right: calc((100% - 24px) / 3 - 22px); top: 22px; border-top: 2px dashed var(--line); z-index: 0; }
+  .route { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 46px 0 22px; }
+  .route::before { content: ""; position: absolute; left: 22px; right: calc((100% - 36px) / 4 - 22px); top: 22px; border-top: 2px dashed var(--line); z-index: 0; }
   .stop { position: relative; z-index: 1; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; }
   .stop .dot { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 2px solid var(--line); font: 800 18px var(--display); color: var(--ink-3); }
   .stop strong { display: block; font: 700 19px/1.2 var(--display); margin: 12px 0 2px; letter-spacing: -0.01em; color: var(--ink-2); }
@@ -134,6 +134,31 @@
   .tick.no { background: #FFF3C2; color: #8A6A00; }
   .evidence .muted { color: var(--ink-3); }
 
+  /* Resume check */
+  .drop input[type=file] { padding: 10px; background: var(--paper); border: 1.5px dashed #B8C3D9; border-radius: 11px; font: 15px var(--body); color: var(--ink-2); }
+  .drop input[type=file]::file-selector-button { border: 0; border-radius: 8px; background: var(--route-soft); color: var(--route); font: 600 15px var(--body); padding: 7px 12px; margin-right: 10px; cursor: pointer; }
+  .privacy { font-size: 14px; color: var(--ink-3); margin: 12px 0 0; max-width: 72ch; }
+  .groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 18px 0 6px; }
+  .groups h3 { font: 700 16px var(--display); margin: 0 0 8px; }
+  .groups p { font-size: 14px; color: var(--ink-3); margin: 0 0 8px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: 14px; padding: 3px 10px; border-radius: 999px; }
+  .tag.used { background: var(--proof-soft); color: var(--proof); }
+  .tag.listed { background: var(--route-soft); color: var(--route); }
+  .tag.missing { background: #FFF3C2; color: #7A5D00; }
+  .ideas { display: grid; gap: 16px; margin-top: 22px; }
+  .ideas > h3 { font: 700 21px var(--display); margin: 8px 0 0; letter-spacing: -0.01em; }
+  .idea { border: 1px solid var(--line); border-left: 4px solid var(--route); border-radius: 0 14px 14px 0; padding: 18px 20px; }
+  .idea h4 { font: 700 19px/1.25 var(--display); margin: 0; }
+  .idea .pitch { margin: 4px 0 10px; color: var(--ink-2); }
+  .idea .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 14px; color: var(--ink-3); }
+  .idea ol { margin: 12px 0; padding-left: 22px; }
+  .idea li { margin: 4px 0; }
+  .idea .done { font-size: 15px; margin: 0 0 12px; }
+  .bullet { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; }
+  .bullet b { display: block; font-size: 13px; color: var(--ink-3); font-weight: 600; margin-bottom: 4px; }
+  .copy { margin-top: 8px; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 5px 11px; font: 600 14px var(--body); color: var(--route); cursor: pointer; }
+
   /* Messages */
   .msg { border-radius: 12px; padding: 14px 16px; margin-top: 18px; font-size: 16px; }
   .msg.wait { background: var(--route-soft); color: var(--ink); }
@@ -158,7 +183,7 @@
     .search .btn { width: 100%; }
     .toggle { border-left: 0; padding: 4px 6px; }
     .route { grid-template-columns: 1fr; gap: 14px; }
-    .route::before { left: 21px; right: auto; top: 22px; bottom: 22px; border-top: 0; border-left: 2px dashed var(--line); }
+    .route::before { left: 21px; right: auto; top: 22px; bottom: 76px; border-top: 0; border-left: 2px dashed var(--line); }
     .stop { display: grid; grid-template-columns: 44px 1fr; column-gap: 14px; align-items: center; }
     .stop strong { margin: 0; }
     .stop .sub { grid-column: 2; }
@@ -169,6 +194,7 @@
     .skill { grid-template-columns: 1fr 74px; }
     .skill .track { grid-column: 1 / -1; grid-row: 2; }
     .how { grid-template-columns: 1fr; gap: 20px; }
+    .groups { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -182,13 +208,14 @@
     <nav aria-label="Tools">
       <a href="#tools" data-go="jobs">Find jobs</a>
       <a href="#tools" data-go="skills">Skills</a>
+      <a href="#tools" data-go="resume">Resume check</a>
       <a href="#tools" data-go="ready">Check my GitHub</a>
     </nav>
   </header>
 
   <section class="hero">
     <h1>Find the job. Learn what it asks for. Prove you can do it.</h1>
-    <p class="lede">ProofPath searches thousands of live jobs and internships, shows which skills employers ask for most, and checks your GitHub for proof. Free, no sign-up.</p>
+    <p class="lede">ProofPath searches thousands of live jobs and internships, shows which skills employers ask for most, checks your resume and GitHub against them, and suggests projects that fill the gaps. Free, no sign-up.</p>
     <form class="search" id="jobs-form" role="search">
       <label class="sr" for="jobs-q">What job are you looking for?</label>
       <input type="text" id="jobs-q" placeholder="Role, skill or city, e.g. python intern" autocomplete="off">
@@ -214,8 +241,11 @@
       <button class="stop" role="tab" aria-selected="false" aria-controls="skills" data-tab="skills">
         <span class="dot">2</span><strong>See the skills</strong><span class="sub">What employers ask for in the role you want</span>
       </button>
+      <button class="stop" role="tab" aria-selected="false" aria-controls="resume" data-tab="resume">
+        <span class="dot">3</span><strong>Fix your resume</strong><span class="sub">What it's missing, and projects that fill the gaps</span>
+      </button>
       <button class="stop" role="tab" aria-selected="false" aria-controls="ready" data-tab="ready">
-        <span class="dot">3</span><strong>Prove you're ready</strong><span class="sub">Which of those skills your GitHub already shows</span>
+        <span class="dot">4</span><strong>Prove you're ready</strong><span class="sub">Which of those skills your GitHub already shows</span>
       </button>
     </div>
 
@@ -242,6 +272,22 @@
         </div>
       </div>
       <div id="skills-out"></div>
+    </section>
+
+    <section class="panel" id="resume" role="tabpanel" hidden>
+      <h2>Is your resume ready for this role?</h2>
+      <p class="hint">Upload your resume and pick the role you want. We compare it with what live postings for that role ask for, then suggest projects to build that would fill the most-wanted gaps.</p>
+      <form class="fields" id="resume-form">
+        <label class="field drop" id="drop">Your resume (PDF or .txt, up to 2 MB)
+          <input type="file" id="resume-file" accept=".pdf,.txt,application/pdf,text/plain">
+        </label>
+        <label class="field">Role you want
+          <input type="text" id="resume-role" placeholder="data analyst intern" autocomplete="off">
+        </label>
+        <button class="btn" type="submit">Check my resume</button>
+      </form>
+      <p class="privacy">Your file is read once and never saved. Your email, phone number and links are removed before the text is analysed. The analysis uses Google's free Gemini service, which may use what it receives to improve its products.</p>
+      <div id="resume-out"></div>
     </section>
 
     <section class="panel" id="ready" role="tabpanel" hidden>
@@ -279,7 +325,7 @@ const pct = (x) => Math.round(x * 100);
 
 function showTab(name) {
   document.querySelectorAll(".stop").forEach(s => s.setAttribute("aria-selected", String(s.dataset.tab === name)));
-  ["jobs", "skills", "ready"].forEach(id => $(id).hidden = id !== name);
+  ["jobs", "skills", "resume", "ready"].forEach(id => $(id).hidden = id !== name);
 }
 document.querySelectorAll(".stop").forEach(s => s.addEventListener("click", () => showTab(s.dataset.tab)));
 document.querySelectorAll("[data-go]").forEach(a => a.addEventListener("click", () => showTab(a.dataset.go)));
@@ -385,6 +431,46 @@ $("ready-form").addEventListener("submit", (e) => {
           <div class="row"><span class="tick ${s.proven ? "yes" : "no"}">${s.proven ? "✓" : "!"}</span>
             <div><b>${esc(s.skill)}</b> <span class="muted">asked for in ${pct(s.demand_share)}% of postings</span><br>
             ${s.proven ? `<span class="muted">Found in </span>${s.repos.map(r => `<a href="https://github.com/${esc(r)}" target="_blank" rel="noopener">${esc(r.split("/")[1])}</a>`).join(", ")}` : '<span class="muted">No proof in your repos yet</span>'}</div></div>`).join("")}</div>`;
+    } catch (err) { fail(out, err.message); }
+  });
+});
+
+$("resume-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const file = $("resume-file").files[0], role = $("resume-role").value.trim(), out = $("resume-out");
+  if (!file || !role) return fail(out, "Choose your resume file and type the role you want.");
+  if (file.size > 2 * 1024 * 1024) return fail(out, "That file is over 2 MB. Export a smaller PDF and try again.");
+  busy(e.submitter, async () => {
+    wait(out, "Reading your resume and live postings for this role. This can take up to a minute.");
+    try {
+      const fd = new FormData(); fd.append("resume", file); fd.append("role", role);
+      const r = await fetch("/resume/check", {method: "POST", body: fd});
+      let d = null; try { d = await r.json(); } catch (_) {}
+      if (r.status === 503) throw new Error("This tool isn't switched on yet. Job search already works; the resume check opens soon.");
+      if (!r.ok) throw new Error(typeof d?.detail === "string" ? d.detail : "That didn't work. Check the file and try again.");
+      const by = (st) => d.skills.filter(s => s.status === st);
+      const tags = (list, cls) => list.length ? `<div class="tags">${list.map(s => `<span class="tag ${cls}">${esc(s.skill)}</span>`).join("")}</div>` : '<p>None</p>';
+      out.innerHTML = `
+        <div class="ready-head"><div class="score">${pct(d.score)}<small>%</small></div>
+          <p>match with what employers ask for in <b>${esc(role)}</b>, from ${d.sample_size} live postings. Skills you have used in a project or job count fully; skills you only list count half.</p></div>
+        <div class="groups">
+          <div><h3>Shown in your work</h3><p>Used in a project or job</p>${tags(by("used"), "used")}</div>
+          <div><h3>Listed only</h3><p>Show where you used these</p>${tags(by("listed"), "listed")}</div>
+          <div><h3>Missing</h3><p>Most wanted first</p>${tags(by("missing").slice(0, 10), "missing")}</div>
+        </div>
+        ${d.projects.length ? `<div class="ideas"><h3>Projects that would close the gap</h3>
+          ${d.projects.map((p, i) => `<article class="idea">
+            <h4>${esc(p.title)}</h4>
+            <p class="pitch">${esc(p.pitch)}</p>
+            <div class="meta">Proves ${p.skills.map(s => `<span class="tag missing">${esc(s)}</span>`).join("")}<span>about ${p.weeks} week${p.weeks > 1 ? "s" : ""}, part-time</span></div>
+            <ol>${p.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>
+            <p class="done"><b>Done when:</b> ${esc(p.done_when)}</p>
+            <div class="bullet"><b>Add this to your resume once it's built. Replace anything in [brackets] with what you measure.</b><span id="bullet-${i}">${esc(p.resume_bullet)}</span>
+              <br><button type="button" class="copy" data-copy="bullet-${i}">Copy bullet</button></div>
+          </article>`).join("")}</div>` : '<div class="next">Your resume already shows every skill on the list. Make sure each one points to a project or job where you used it.</div>'}`;
+      out.querySelectorAll(".copy").forEach(b => b.addEventListener("click", async () => {
+        await navigator.clipboard.writeText($(b.dataset.copy).textContent); b.textContent = "Copied";
+      }));
     } catch (err) { fail(out, err.message); }
   });
 });
