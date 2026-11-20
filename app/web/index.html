@@ -239,6 +239,7 @@
     <form class="search" id="jobs-form" role="search">
       <label class="sr" for="jobs-q">What job are you looking for?</label>
       <input type="text" id="jobs-q" placeholder="Role, skill or city, e.g. python intern" autocomplete="off">
+      <label class="toggle"><input type="checkbox" id="jobs-india" checked> In India</label>
       <label class="toggle"><input type="checkbox" id="jobs-remote"> Remote only</label>
       <button class="btn" type="submit">Search jobs</button>
     </form>
@@ -442,6 +443,7 @@ $("jobs-form").addEventListener("submit", (e) => {
     try {
       const p = new URLSearchParams({q, limit: 20});
       if ($("jobs-remote").checked) p.set("remote", "true");
+      if ($("jobs-india").checked) p.set("india", "true");
       p.set("field", chosen("field-chips", "field"));
       chosen("level-chips", "level").split(",").filter(Boolean).forEach(l => p.append("level", l));
       const d = await getJSON(`/search?${p}`);

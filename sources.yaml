@@ -24,6 +24,12 @@ greenhouse:
   - slice
   - glance
   - hackerrank
+  - razorpaysoftwareprivatelimited
+  - okta        # large teams in Bengaluru
+  - zscaler     # Bengaluru, Mohali
+  - rubrik      # Bengaluru
+  - twilio      # Bengaluru
+  - sumologic   # Noida
 
 lever:
   - {slug: cred, name: CRED}
@@ -38,3 +44,4 @@ ashby:   # jobs.ashbyhq.com/<slug>
   - {slug: sarvam, name: Sarvam AI}
   - {slug: linear, name: Linear}
   - {slug: cohere, name: Cohere}
+  - {slug: atlan, name: Atlan}

@@ -24,7 +24,7 @@ API = "https://api.telegram.org/bot{token}/{method}"
 SITE = "https://proofpath-ganeshpokharkars-projects.vercel.app"
 
 HELP = (
-    "Hi! I'm <b>ProofPath</b>. I search thousands of live job postings for you.\n\n"
+    "Hi! I'm <b>ProofPath</b>. I search live job postings in India for you.\n\n"
     "<b>/jobs</b> <i>what you want</i> - e.g. <code>/jobs python intern bangalore</code>\n"
     "<b>/skills</b> <i>a role</i> - which skills employers ask for, e.g. <code>/skills data analyst</code>\n"
     "<b>/alerts</b> <i>a search</i> - I'll message you new matching jobs every day\n"
@@ -104,7 +104,7 @@ def handle_update(update: dict, deps: Deps) -> tuple[int, str] | None:
         query = arg if command == "/jobs" else text
         if not query:
             return chat_id, "Tell me what you're looking for, e.g. <code>/jobs react developer remote</code>"
-        hits = hybrid_search(deps.session, deps.embedder_factory(), query, limit=5)
+        hits = hybrid_search(deps.session, deps.embedder_factory(), query, SearchFilters(india=True), limit=5)
         if not hits:
             return chat_id, f"No open jobs match <b>{_esc(query)}</b> yet. Try fewer or broader words."
         return chat_id, f"Top jobs for <b>{_esc(query)}</b>:\n\n{format_jobs(hits)}"
@@ -159,7 +159,11 @@ def build_alerts(session: Session, embedder: Embedder, now: datetime | None = No
     messages = []
     for chat in session.scalars(select(TelegramChat).where(TelegramChat.alerts_on)):
         hits = hybrid_search(
-            session, embedder, chat.alert_query, SearchFilters(exclude_sources=("remotive",)), limit=30
+            session,
+            embedder,
+            chat.alert_query,
+            SearchFilters(exclude_sources=("remotive",), india=True),
+            limit=30,
         )
         since = chat.last_alert_at or now
         fresh_ids = set(

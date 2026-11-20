@@ -83,12 +83,14 @@ def test_alerts_send_only_new_matching_jobs(deps, session, embedder):
     sync_postings(
         session,
         FakeSource(),
-        [*CORPUS, posting("n1", "Python Intern", "Python and FastAPI.")],
+        [*CORPUS, posting("n1", "Python Intern", "Python and FastAPI.", location="Pune, India")],
         embedder,
         later,
         timedelta(days=14),
     )
-    remotive = [posting("r1", "Python Intern (Remotive)", "Python internship.", remote=True)]
+    remotive = [
+        posting("r1", "Python Intern (Remotive)", "Python internship.", remote=True, location="India")
+    ]
     sync_postings(
         session,
         FakeSource(key="remotive", full_snapshot=False),

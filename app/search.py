@@ -16,6 +16,15 @@ from sqlalchemy.orm import Session
 
 from app.embeddings import Embedder
 
+# A job is "in India" when its location names India or an Indian city or state.
+INDIA_RE = (
+    r"\m(india|bharat|bengaluru|bangalore|mumbai|bombay|pune|hyderabad|chennai|madras|delhi|new delhi|"
+    r"ncr|gurgaon|gurugram|noida|kolkata|calcutta|ahmedabad|jaipur|kochi|cochin|thiruvananthapuram|"
+    r"trivandrum|coimbatore|indore|chandigarh|mohali|lucknow|nagpur|bhubaneswar|vadodara|surat|mysore|"
+    r"mysuru|visakhapatnam|goa|karnataka|maharashtra|telangana|tamil nadu|kerala|haryana|uttar pradesh|"
+    r"west bengal|gujarat|rajasthan)\M"
+)
+
 
 @dataclass(frozen=True)
 class SearchFilters:
@@ -27,6 +36,7 @@ class SearchFilters:
     exclude_sources: tuple[str, ...] = field(default_factory=tuple)
     fields: tuple[str, ...] | None = None  # e.g. ("software", "data_ai"); see app/ingest/classify.py
     levels: tuple[str, ...] | None = None  # e.g. ("intern", "entry")
+    india: bool = False  # only jobs whose location is in India (see INDIA_RE)
 
 
 @dataclass(frozen=True)
@@ -56,6 +66,9 @@ def _filter_sql(filters: SearchFilters, params: dict) -> str:
     if filters.remote is not None:
         clauses.append("j.remote = :f_remote")
         params["f_remote"] = filters.remote
+    if filters.india:
+        clauses.append("j.location ~* :f_india")
+        params["f_india"] = INDIA_RE
     if filters.location:
         clauses.append("j.location ILIKE :f_location")
         params["f_location"] = f"%{filters.location}%"

@@ -208,9 +208,11 @@ def search(
     ] = None,
     level: Annotated[list[str] | None, Query(description="intern, entry, mid, senior")] = None,
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
+    india: bool = False,
 ) -> SearchResponse:
     settings = get_settings()
     filters = SearchFilters(
+        india=india,
         remote=remote,
         location=location,
         company=company,

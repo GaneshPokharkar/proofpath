@@ -243,3 +243,16 @@ def test_same_job_on_two_boards_is_stored_once(session, embedder):
     assert stats.inserted == 0
     n = session.execute(text("SELECT count(*) FROM jobs WHERE company = 'Acme Corp.'")).scalar()
     assert n == 1
+
+
+def test_india_filter(session, embedder):
+    src = FakeSource()
+    jobs = [
+        posting("i1", "Backend Engineer", "Python APIs", location="Bengaluru, Karnataka"),
+        posting("i2", "Backend Engineer II", "Python APIs", location="Remote - India"),
+        posting("i3", "Backend Engineer III", "Python APIs", location="London, UK"),
+        posting("i4", "Backend Engineer IV", "Python APIs", location="Indianapolis, IN"),
+    ]
+    sync_postings(session, src, jobs, embedder, datetime.now(UTC), timedelta(days=14))
+    hits = hybrid_search(session, embedder, "backend engineer", SearchFilters(india=True), limit=10)
+    assert {h.location for h in hits} == {"Bengaluru, Karnataka", "Remote - India"}

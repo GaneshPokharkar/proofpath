@@ -90,6 +90,7 @@ def search_jobs(
     remote: bool | None = None,
     location: str | None = None,
     limit: int = 5,
+    india: bool = True,
 ) -> dict:
     if not query or not str(query).strip():
         raise ToolError("query is required, e.g. 'python backend intern'")
@@ -104,7 +105,11 @@ def search_jobs(
     if level and level not in LEVEL_LABELS:
         raise ToolError(f"level must be one of {sorted(LEVEL_LABELS)}")
     filters = SearchFilters(
-        remote=remote, location=location or None, fields=fields, levels=(level,) if level else None
+        remote=remote,
+        location=location or None,
+        fields=fields,
+        levels=(level,) if level else None,
+        india=bool(india),
     )
     hits = hybrid_search(
         ctx.session, ctx.embedder, str(query), filters, limit=max(1, min(int(limit or 5), 10))
@@ -248,6 +253,11 @@ DECLARATIONS = [
                 "remote": {"type": "BOOLEAN", "description": "true only when the student asks for remote"},
                 "location": {"type": "STRING", "description": "City or country the student named"},
                 "limit": {"type": "INTEGER", "description": "How many jobs, 1-10 (default 5)"},
+                "india": {
+                    "type": "BOOLEAN",
+                    "description": "Only jobs in India (default true). false only if the student asks for "
+                    "jobs abroad, worldwide, or names a place outside India",
+                },
             },
             "required": ["query"],
         },
