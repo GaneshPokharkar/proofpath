@@ -216,6 +216,53 @@
     .how { grid-template-columns: 1fr; gap: 20px; }
     .groups { grid-template-columns: 1fr; }
   }
+
+  /* Score a job, resume target, path to 100, edits */
+  .score-btn { margin-top: 10px; background: none; border: 0; padding: 0; color: var(--route); font: 600 15px var(--body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .target { border: 1.5px solid var(--route); border-radius: 12px; padding: 14px 16px; margin: 0 0 18px; background: #F3F6FD; }
+  .target h3 { margin: 0 0 2px; font: 700 18px/1.25 var(--display); }
+  .target p { margin: 0; color: var(--ink-2); font-size: 15px; }
+  .target button { margin-top: 8px; background: none; border: 0; padding: 0; color: var(--route); font: 600 14px var(--body); cursor: pointer; text-decoration: underline; }
+  .gaps { list-style: none; padding: 0; margin: 10px 0 0; }
+  .gaps li { display: grid; grid-template-columns: 70px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .gaps .pts { font: 800 20px/1 var(--display); color: var(--proof); }
+  .gaps .pts small { font-size: 12px; font-weight: 600; }
+  .edit { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 8px 0; }
+  .edit .ex { display: block; margin-top: 6px; padding: 8px 10px; background: #FFF8D6; border-radius: 8px; }
+  .linkbtn { background: none; border: 0; padding: 0; color: var(--route); font: inherit; text-decoration: underline; cursor: pointer; }
+
+  /* Resume fit on every job */
+  .fitbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px; margin: 0 0 16px; border: 1.5px dashed #B9C6E6; border-radius: 12px; background: #F7F9FE; }
+  .fitfile { cursor: pointer; font-size: 15px; }
+  .fitfile input { max-width: 230px; }
+  #fit-state { font-size: 14px; color: var(--ink-2); }
+  .fit { margin-top: 8px; }
+  .fit .badge { display: inline-block; font: 800 15px/1 var(--display); padding: 6px 10px; border-radius: 999px; color: #fff; }
+  .fit .hi { background: var(--proof); } .fit .mid { background: #9A5B00; } .fit .lo { background: #B42318; }
+  .fit details { margin-top: 6px; font-size: 15px; }
+  .fit summary { cursor: pointer; color: var(--route); font-weight: 600; }
+  .fit ul { margin: 6px 0 0; padding-left: 0; list-style: none; }
+  .fit li { padding: 4px 0; border-top: 1px solid var(--line); }
+  .fit li b.pts { color: var(--proof); display: inline-block; min-width: 54px; }
+
+  /* Floating chat */
+  .chat-fab { position: fixed; right: 20px; bottom: 20px; z-index: 51; padding: 14px 20px; border: 0; border-radius: 999px; background: var(--route); color: #fff; font: 700 16px var(--body); cursor: pointer; box-shadow: 0 8px 24px rgba(41,82,204,.35); }
+  .chatbox { position: fixed; right: 20px; bottom: 84px; z-index: 50; width: min(420px, calc(100vw - 32px)); max-height: min(640px, calc(100vh - 110px)); display: flex; flex-direction: column; padding: 18px; border: 1.5px solid var(--line); border-radius: 16px; background: #fff; box-shadow: 0 12px 40px rgba(20,33,61,.18); }
+  .chatbox[hidden] { display: none; }
+  .chatbox h2 { margin: 0 0 4px; font: 800 22px/1.15 var(--display); }
+  .chatbox .hint { font-size: 14px; margin: 4px 28px 0 0; }
+  .chat-close { position: absolute; top: 10px; right: 12px; background: none; border: 0; font-size: 26px; line-height: 1; color: var(--ink-3); cursor: pointer; }
+  .chat-fab:focus-visible, .chat-close:focus-visible { outline: 3px solid var(--marker); outline-offset: 2px; }
+  .chat-log { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; flex: 1; min-height: 120px; overflow-y: auto; }
+  .msg-me { align-self: flex-end; background: var(--route); color: #fff; padding: 9px 13px; border-radius: 14px 14px 4px 14px; max-width: 85%; }
+  .msg-bot { align-self: flex-start; background: #F3F6FD; padding: 10px 14px; border-radius: 14px 14px 14px 4px; max-width: 95%; }
+  .msg-bot .jobcard { display: block; margin: 8px 0 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; text-decoration: none; color: var(--ink); }
+  .msg-bot .jobcard small { display: block; color: var(--ink-3); }
+  .msg-bot .used { display: block; margin-top: 6px; font-size: 12px; color: var(--ink-3); }
+  .chat-form { display: flex; gap: 8px; }
+  .chat-form input { flex: 1; min-width: 0; padding: 12px 14px; border: 1.5px solid #C8D1E3; border-radius: 10px; font: inherit; }
+  .memline { font-size: 13px; color: var(--ink-3); margin: 8px 0 0; }
+  @media (max-width: 560px) { .chatbox { right: 8px; left: 8px; width: auto; bottom: 76px; } .chat-fab { right: 12px; bottom: 12px; } }
 </style>
 </head>
 <body>
@@ -349,7 +396,9 @@
       <div id="ready-out"></div>
     </section>
 
-    <section class="chatbox" aria-labelledby="chat-h">
+    <button type="button" class="chat-fab" id="chat-fab" aria-controls="chat-panel" aria-expanded="false">Ask ProofPath</button>
+    <section class="chatbox" id="chat-panel" aria-labelledby="chat-h" hidden>
+      <button type="button" class="chat-close" id="chat-close" aria-label="Close chat">×</button>
       <h2 id="chat-h">Ask ProofPath</h2>
       <p class="hint">Say what you want in your own words: “remote data internships, I know Python and SQL”, “compare the first two”, “save that one”, “is it a fit for me?”. It remembers your skills, places and shortlist on this device for a day; <button type="button" class="linkbtn" id="chat-forget">forget me</button>.</p>
       <div id="chat-log" class="chat-log" aria-live="polite"></div>
@@ -772,6 +821,17 @@ $("fit-file").addEventListener("change", async () => {
     scoreJobs();
   } catch (err) { $("fit-state").textContent = err.message; }
 });
+
+function setChat(open) {
+  $("chat-panel").hidden = !open;
+  $("chat-fab").setAttribute("aria-expanded", String(open));
+  $("chat-fab").textContent = open ? "Close chat" : "Ask ProofPath";
+  if (open) { $("chat-in").focus(); showMemory(); }
+}
+$("chat-fab").addEventListener("click", () => setChat($("chat-panel").hidden));
+$("chat-close").addEventListener("click", () => setChat(false));
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("chat-panel").hidden) { setChat(false); $("chat-fab").focus(); } });
+if (location.hash === "#chat" || location.hash === "#chat-h") setChat(true);
 </script>
 </body>
 </html>
