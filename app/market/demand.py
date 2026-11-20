@@ -31,7 +31,7 @@ class MarketRead:
 
 def market_read(
     session: Session,
-    llm: StructuredLLM,
+    llm: StructuredLLM | None,
     embedder: Embedder,
     role: str,
     filters: SearchFilters = SearchFilters(),
@@ -76,6 +76,10 @@ def _cache_key(role: str, filters: SearchFilters, sample: int) -> str:
     return f"{words}|loc={(filters.location or '').lower()}|remote={filters.remote}|n={sample}"
 
 
+class NeedsKey(LookupError):
+    """No saved report for this role and no AI key to build one."""
+
+
 def cached_market_read(
     session: Session,
     llm: StructuredLLM,
@@ -105,6 +109,8 @@ def cached_market_read(
             p["role"], p["sample_size"], p["job_ids"], [SkillDemand(**s) for s in p["skills"]]
         ), True
 
+    if llm is None:
+        raise NeedsKey(role)
     read = market_read(session, llm, embedder, role, filters, sample=sample, min_share=0.1)
     payload = {
         "role": read.role,

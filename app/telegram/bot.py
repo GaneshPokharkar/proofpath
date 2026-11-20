@@ -21,13 +21,16 @@ from app.search import SearchFilters, hybrid_search
 
 API = "https://api.telegram.org/bot{token}/{method}"
 
+SITE = "https://proofpath-ganeshpokharkars-projects.vercel.app"
+
 HELP = (
     "Hi! I'm <b>ProofPath</b>. I search thousands of live job postings for you.\n\n"
     "<b>/jobs</b> <i>what you want</i> - e.g. <code>/jobs python intern bangalore</code>\n"
     "<b>/skills</b> <i>a role</i> - which skills employers ask for, e.g. <code>/skills data analyst</code>\n"
     "<b>/alerts</b> <i>a search</i> - I'll message you new matching jobs every day\n"
     "<b>/alerts off</b> - stop daily alerts\n"
-    "<b>/help</b> - this message"
+    "<b>/help</b> - this message\n\n"
+    "Free for everyone. I keep only your chat number, and only while daily alerts are on."
 )
 
 
@@ -90,8 +93,8 @@ def handle_update(update: dict, deps: Deps) -> tuple[int, str] | None:
 
     deps.session.execute(
         pg_insert(TelegramChat)
-        .values(chat_id=chat_id, username=username or None)
-        .on_conflict_do_update(index_elements=[TelegramChat.chat_id], set_={"username": username or None})
+        .values(chat_id=chat_id)  # only the chat number; no names are stored
+        .on_conflict_do_nothing(index_elements=[TelegramChat.chat_id])
     )
 
     if command in ("/start", "/help"):
@@ -109,9 +112,15 @@ def handle_update(update: dict, deps: Deps) -> tuple[int, str] | None:
     if command == "/skills":
         if not arg:
             return chat_id, "Which role? e.g. <code>/skills machine learning engineer</code>"
-        if deps.market is None:
-            return chat_id, "Skill analysis isn't switched on yet (the AI key hasn't been added). Try /jobs."
-        read = deps.market(arg)
+        from app.market.demand import NeedsKey
+
+        try:
+            read = deps.market(arg)
+        except NeedsKey:
+            return chat_id, (
+                f"Nobody has checked <b>{_esc(arg)}</b> this week yet. Open {SITE}, add your free "
+                "Gemini key and look it up once; after that I'll answer it instantly for everyone."
+            )
         if not read.skills:
             return chat_id, f"I couldn't find enough postings for <b>{_esc(arg)}</b>."
         rows = [

@@ -19,7 +19,7 @@ from app.config import get_settings
 from app.db import get_session
 from app.embeddings import Embedder, FastEmbedEmbedder
 from app.llm import StructuredLLM, build_llm
-from app.market.demand import cached_market_read
+from app.market.demand import NeedsKey, cached_market_read
 from app.models import IngestionRun, Job
 from app.search import SearchFilters, hybrid_search
 
@@ -40,6 +40,13 @@ async def _lifespan(_app):
 
 
 app = FastAPI(title="ProofPath", version="0.2.0", lifespan=_lifespan)
+
+
+@app.exception_handler(NeedsKey)
+async def _needs_key(_request: Request, _exc: NeedsKey):
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(status_code=503, content={"detail": "Add your Gemini key to analyse this role"})
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
@@ -71,6 +78,19 @@ def get_llm(request: Request) -> StructuredLLM:
 
 
 LLMDep = Annotated[StructuredLLM, Depends(get_llm)]
+
+
+def get_optional_llm(request: Request) -> StructuredLLM | None:
+    """Like get_llm, but None when there is no key: saved reports still work for everyone."""
+    try:
+        return get_llm(request)
+    except HTTPException as exc:
+        if exc.status_code == 503:
+            return None
+        raise
+
+
+OptionalLLMDep = Annotated[StructuredLLM | None, Depends(get_optional_llm)]
 
 
 class JobHit(BaseModel):
@@ -301,7 +321,7 @@ class MarketResponse(BaseModel):
 def market(
     session: SessionDep,
     embedder: EmbedderDep,
-    llm: LLMDep,
+    llm: OptionalLLMDep,
     role: Annotated[str, Query(min_length=2, max_length=120)],
     location: str | None = None,
     remote: bool | None = None,
@@ -344,7 +364,7 @@ class ReadinessResponse(BaseModel):
 def readiness_endpoint(
     session: SessionDep,
     embedder: EmbedderDep,
-    llm: LLMDep,
+    llm: OptionalLLMDep,
     github: Annotated[str, Query(min_length=1, max_length=39, pattern=r"^[A-Za-z0-9-]+$")],
     role: Annotated[str, Query(min_length=2, max_length=120)],
     sample: Annotated[int, Query(ge=5, le=40)] = 20,
@@ -493,9 +513,7 @@ async def telegram_webhook(request: Request) -> dict:
             embedder_factory=lambda: get_embedder(request),
             admins={a.strip().lstrip("@").lower() for a in s.telegram_admins.split(",") if a.strip()},
             refresh=lambda force: _refresh(request, force),
-            market=(lambda role: cached_market_read(session, llm, get_embedder(request), role, sample=20)[0])
-            if llm
-            else None,
+            market=(lambda role: cached_market_read(session, llm, get_embedder(request), role, sample=30)[0]),
         )
         reply = handle_update(update, deps)
     if reply:
@@ -594,7 +612,7 @@ async def resume_check(
         text = extract_text(resume.filename or "", data)
     except ResumeError as exc:
         raise HTTPException(422, str(exc)) from exc
-    read, _ = cached_market_read(session, llm, embedder, role, sample=20)
+    read, _ = cached_market_read(session, llm, embedder, role, sample=30)
     report = check_resume(llm, text, read)
     return ResumeResponse(
         role=report.role,

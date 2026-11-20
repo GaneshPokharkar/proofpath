@@ -54,8 +54,15 @@ def test_bot_escapes_html_in_user_text(deps):
     assert "&lt;b&gt;x&lt;/b&gt;" in reply
 
 
-def test_skills_without_ai_key_explains(deps):
-    assert "isn't switched on" in handle_update(msg("/skills data analyst"), deps)[1]
+def test_skills_without_saved_report_points_to_site(deps):
+    from app.market.demand import NeedsKey
+
+    def no_report(role):
+        raise NeedsKey(role)
+
+    deps.market = no_report
+    reply = handle_update(msg("/skills data analyst"), deps)[1]
+    assert "Nobody has checked" in reply and "Gemini key" in reply
 
 
 def test_refresh_is_admin_only(deps):

@@ -58,7 +58,7 @@ def test_market_needs_llm_key(client, monkeypatch):
 
     monkeypatch.setattr(get_settings(), "llm_api_key", None)
     r = client.get("/market", params={"role": "backend engineer"})
-    assert r.status_code == 503 and "LLM_API_KEY" in r.json()["detail"]
+    assert r.status_code == 503 and "Gemini key" in r.json()["detail"]
 
 
 def test_market_endpoint_with_fake_llm(client):
