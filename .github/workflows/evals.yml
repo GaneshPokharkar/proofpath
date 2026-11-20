@@ -68,7 +68,7 @@ jobs:
               for k, v in m.items():
                   print(f"| {k} | {v} |")
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always() && steps.key.outputs.missing != 'true'
         with:
           name: eval-report
