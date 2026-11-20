@@ -3,6 +3,21 @@ name = "jobpilot"
 version = "0.1.0"
 description = "AI job-search agent with hybrid semantic search over live job postings"
 requires-python = ">=3.12"
+# Keep in sync with requirements.txt (Vercel installs from this list).
+dependencies = [
+    "fastapi==0.165.0",
+    "uvicorn[standard]==0.54.0",
+    "SQLAlchemy==2.1.9",
+    "psycopg[binary]==3.3.9",
+    "pgvector==0.5.1",
+    "alembic==1.20.1",
+    "pydantic-settings==2.16.3",
+    "httpx==0.28.1",
+    "fastembed==0.9.1",
+    "beautifulsoup4==4.15.0",
+    "PyYAML==6.0.3",
+    "anthropic==2.11.0",
+]
 
 [tool.ruff]
 line-length = 110
