@@ -20,6 +20,10 @@ greenhouse:
   - mongodb
   - airbnb
   - figma
+  - druva
+  - slice
+  - glance
+  - hackerrank
 
 lever:
   - {slug: cred, name: CRED}
@@ -28,3 +32,4 @@ lever:
   - {slug: paytm, name: Paytm}
   - {slug: palantir, name: Palantir}
   - {slug: spotify, name: Spotify}
+  - {slug: mindtickle, name: MindTickle}

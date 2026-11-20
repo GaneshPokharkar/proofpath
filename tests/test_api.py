@@ -71,3 +71,11 @@ def test_market_endpoint_with_fake_llm(client):
         del app.state.llm
     assert body["sample_size"] >= 1
     assert any(s["skill"] == "Kubernetes" for s in body["skills"])
+
+
+def test_fields_endpoint_and_tech_filter(client):
+    body = client.get("/fields").json()
+    assert {f["key"] for f in body["fields"]} >= {"software", "data_ai", "other"}
+    tech = client.get("/search", params={"q": "manager accounts", "field": "tech"}).json()
+    assert all(r["field"] != "other" for r in tech["results"])
+    assert client.get("/search", params={"q": "x", "field": "astrology"}).status_code == 422

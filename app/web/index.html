@@ -62,6 +62,15 @@
   .chips { display: flex; gap: 8px; flex-wrap: wrap; }
   .chip { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 5px 12px; font: 15px var(--body); cursor: pointer; }
   .chip:hover { border-color: var(--route); color: var(--route); }
+  .filters { max-width: 900px; margin-top: 16px; display: grid; gap: 10px; }
+  .filter-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .filter-row .try { width: 46px; }
+  .opt { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 9px; padding: 6px 12px; font: 600 14px var(--body); cursor: pointer; }
+  .opt small { font-weight: 400; color: var(--ink-3); margin-left: 4px; }
+  .opt:hover { border-color: var(--route); color: var(--route); }
+  .opt[aria-checked="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .opt[aria-checked="true"] small { color: #C9D2E6; }
+  .lvl { display: inline-block; font-size: 13px; font-weight: 600; padding: 1px 9px; border-radius: 999px; background: var(--route-soft); color: var(--route); margin-left: 8px; vertical-align: 2px; }
   .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: var(--ink-2); cursor: pointer; padding: 0 10px; white-space: nowrap; border-left: 1px solid var(--line); }
   .toggle input { width: 18px; height: 18px; accent-color: var(--route); }
 
@@ -182,6 +191,7 @@
     .search { flex-direction: column; box-shadow: 4px 4px 0 var(--route-soft); }
     .search .btn { width: 100%; }
     .toggle { border-left: 0; padding: 4px 6px; }
+    .filter-row .try { width: 100%; }
     .route { grid-template-columns: 1fr; gap: 14px; }
     .route::before { left: 21px; right: auto; top: 22px; bottom: 76px; border-top: 0; border-left: 2px dashed var(--line); }
     .stop { display: grid; grid-template-columns: 44px 1fr; column-gap: 14px; align-items: center; }
@@ -222,6 +232,18 @@
       <label class="toggle"><input type="checkbox" id="jobs-remote"> Remote only</label>
       <button class="btn" type="submit">Search jobs</button>
     </form>
+    <div class="filters">
+      <div class="filter-row" role="radiogroup" aria-label="Field" id="field-chips">
+        <span class="try">Field</span>
+        <button type="button" class="opt" role="radio" aria-checked="true" data-field="tech">All tech</button>
+      </div>
+      <div class="filter-row" role="radiogroup" aria-label="Experience level" id="level-chips">
+        <span class="try">Level</span>
+        <button type="button" class="opt" role="radio" aria-checked="true" data-level="">Any</button>
+        <button type="button" class="opt" role="radio" aria-checked="false" data-level="intern">Internship</button>
+        <button type="button" class="opt" role="radio" aria-checked="false" data-level="entry,intern">Entry level / fresher</button>
+      </div>
+    </div>
     <div class="under">
       <span class="try">Try</span>
       <div class="chips" data-for="jobs-q">
@@ -372,14 +394,16 @@ $("jobs-form").addEventListener("submit", (e) => {
     try {
       const p = new URLSearchParams({q, limit: 20});
       if ($("jobs-remote").checked) p.set("remote", "true");
+      p.set("field", chosen("field-chips", "field"));
+      chosen("level-chips", "level").split(",").filter(Boolean).forEach(l => p.append("level", l));
       const d = await getJSON(`/search?${p}`);
-      if (!d.results.length) return fail(out, "No open jobs match that yet. Try fewer words, or a broader role like “developer”.");
+      if (!d.results.length) return fail(out, "No open jobs match that yet. Try fewer words, a broader role like “developer”, or another field or level.");
       requestAnimationFrame(() => $("jobs").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"}));
       out.innerHTML = `<p class="count">${d.results.length} jobs for “${esc(q)}”, best matches first</p>` + d.results.map(j => {
         const [bg, fg] = tint(j.company);
         return `<article class="job">
           <div class="avatar" style="background:${bg};color:${fg}" aria-hidden="true">${esc(j.company.trim()[0] || "?")}</div>
-          <div><h3>${esc(j.title)}${j.remote ? '<span class="pill">Remote</span>' : ""}</h3>
+          <div><h3>${esc(j.title)}${j.remote ? '<span class="pill">Remote</span>' : ""}${j.level === "intern" ? '<span class="lvl">Internship</span>' : j.level === "entry" ? '<span class="lvl">Entry level</span>' : ""}</h3>
             <div class="where"><b>${esc(j.company)}</b>${j.location ? `, ${esc(j.location)}` : ""}</div>
             <div class="where">${ago(j.posted_at)}</div>
             <p>${esc(j.snippet)}</p></div>
@@ -474,6 +498,31 @@ $("resume-form").addEventListener("submit", (e) => {
     } catch (err) { fail(out, err.message); }
   });
 });
+
+const chosen = (group, attr) => document.querySelector(`#${group} .opt[aria-checked="true"]`)?.dataset[attr] ?? "";
+function wireOptions(group) {
+  $(group).addEventListener("click", (e) => {
+    const b = e.target.closest(".opt");
+    if (!b) return;
+    $(group).querySelectorAll(".opt").forEach(o => o.setAttribute("aria-checked", String(o === b)));
+    if ($("jobs-q").value.trim()) $("jobs-form").requestSubmit();
+  });
+}
+wireOptions("field-chips"); wireOptions("level-chips");
+fetch("/fields").then(r => r.ok ? r.json() : null).then(d => {
+  if (!d) return;
+  const tech = d.fields.filter(f => f.key !== "other");
+  const all = $("field-chips").querySelector('[data-field="tech"]');
+  all.innerHTML = `All tech<small>${tech.reduce((a, f) => a + f.jobs, 0).toLocaleString("en-IN")}</small>`;
+  tech.filter(f => f.jobs > 0).sort((a, b) => b.jobs - a.jobs).forEach(f => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "opt"; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", "false");
+    b.dataset.field = f.key; b.innerHTML = `${esc(f.label)}<small>${f.jobs.toLocaleString("en-IN")}</small>`;
+    $("field-chips").appendChild(b);
+  });
+  const lv = Object.fromEntries(d.levels.map(l => [l.key, l.jobs]));
+  $("level-chips").querySelector('[data-level="intern"]').innerHTML = `Internship<small>${lv.intern || 0}</small>`;
+}).catch(() => {});
 
 fetch("/admin/status").then(r => r.ok ? r.json() : null).then(s => {
   if (!s?.last_refresh) return;

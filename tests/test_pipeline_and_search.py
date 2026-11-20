@@ -200,3 +200,16 @@ def test_title_match_beats_boilerplate_mentions(session, embedder):
     hits = hybrid_search(session, embedder, "devops engineer kubernetes terraform")
     assert hits[0].title == "DevOps Engineer"
     assert hits[0].keyword_rank == 1 and hits[0].semantic_rank == 1
+
+
+def test_search_filters_by_field_and_level(session, embedder):
+    jobs = [
+        posting("f1", "Data Analyst Intern", "SQL and Python dashboards."),
+        posting("f2", "Senior Data Engineer", "Spark and Python pipelines."),
+        posting("f3", "Account Executive", "Sell Python training courses."),
+    ]
+    sync_postings(session, FakeSource(key="lever:fieldco"), jobs, embedder, NOW, EXPIRE)
+    data = hybrid_search(session, embedder, "python", SearchFilters(fields=("data_ai",)))
+    assert {h.title for h in data} == {"Data Analyst Intern", "Senior Data Engineer"}
+    interns = hybrid_search(session, embedder, "python", SearchFilters(levels=("intern", "entry")))
+    assert [h.title for h in interns] == ["Data Analyst Intern"] and interns[0].field == "data_ai"

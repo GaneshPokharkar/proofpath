@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.embeddings import Embedder
 from app.ingest.base import JobPosting, Source
+from app.ingest.classify import classify_field, classify_level
 from app.models import IngestionRun, Job, JobEmbedding
 
 log = logging.getLogger(__name__)
@@ -70,6 +71,8 @@ def _row(posting: JobPosting, source_key: str, now: datetime) -> dict:
         "last_seen_at": now,
         "content_hash": posting.content_hash(),
         "is_active": True,
+        "field": classify_field(posting.title),
+        "level": classify_level(posting.title),
     }
 
 

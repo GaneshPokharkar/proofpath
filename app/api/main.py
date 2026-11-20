@@ -63,6 +63,8 @@ class JobHit(BaseModel):
     score: float
     keyword_rank: int | None
     semantic_rank: int | None
+    field: str
+    level: str
 
 
 class SearchResponse(BaseModel):
@@ -88,6 +90,39 @@ class JobDetail(BaseModel):
     is_active: bool
 
 
+def _expand_fields(field: list[str] | None) -> tuple[str, ...] | None:
+    from app.ingest.classify import FIELD_LABELS, TECH_FIELDS
+
+    if not field:
+        return None
+    out: list[str] = []
+    for f in field:
+        if f == "tech":
+            out.extend(TECH_FIELDS)
+        elif f in FIELD_LABELS:
+            out.append(f)
+        else:
+            raise HTTPException(422, f"Unknown field {f!r}")
+    return tuple(dict.fromkeys(out))
+
+
+@app.get("/fields")
+def fields(session: SessionDep) -> dict:
+    """Fields and levels students can filter by, with how many open jobs each has."""
+    from app.ingest.classify import FIELD_LABELS, LEVEL_LABELS
+
+    counts = dict(
+        session.execute(text("SELECT field, count(*) FROM jobs WHERE is_active GROUP BY field")).all()
+    )
+    levels = dict(
+        session.execute(text("SELECT level, count(*) FROM jobs WHERE is_active GROUP BY level")).all()
+    )
+    return {
+        "fields": [{"key": k, "label": v, "jobs": counts.get(k, 0)} for k, v in FIELD_LABELS.items()],
+        "levels": [{"key": k, "label": v, "jobs": levels.get(k, 0)} for k, v in LEVEL_LABELS.items()],
+    }
+
+
 @app.get("/health")
 def health(session: SessionDep) -> dict:
     session.execute(text("SELECT 1"))
@@ -104,6 +139,14 @@ def search(
     company: str | None = None,
     posted_within_days: Annotated[int | None, Query(ge=1, le=365)] = None,
     source: Annotated[list[str] | None, Query()] = None,
+    field: Annotated[
+        list[str] | None,
+        Query(
+            description="software, data_ai, devops_cloud, security, mobile, "
+            "frontend, qa, design, product, other; or 'tech' for all but other"
+        ),
+    ] = None,
+    level: Annotated[list[str] | None, Query(description="intern, entry, mid, senior")] = None,
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
 ) -> SearchResponse:
     settings = get_settings()
@@ -113,6 +156,8 @@ def search(
         company=company,
         posted_within_days=posted_within_days,
         sources=tuple(source) if source else None,
+        fields=_expand_fields(field),
+        levels=tuple(level) if level else None,
     )
     start = time.perf_counter()
     hits = hybrid_search(
@@ -143,6 +188,8 @@ def search(
                 score=round(h.score, 5),
                 keyword_rank=h.keyword_rank,
                 semantic_rank=h.semantic_rank,
+                field=h.field,
+                level=h.level,
             )
             for h in hits
         ],

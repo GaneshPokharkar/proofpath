@@ -25,6 +25,8 @@ class SearchFilters:
     posted_within_days: int | None = None
     sources: tuple[str, ...] | None = None  # source key prefixes, e.g. ("greenhouse", "lever:cred")
     exclude_sources: tuple[str, ...] = field(default_factory=tuple)
+    fields: tuple[str, ...] | None = None  # e.g. ("software", "data_ai"); see app/ingest/classify.py
+    levels: tuple[str, ...] | None = None  # e.g. ("intern", "entry")
 
 
 @dataclass(frozen=True)
@@ -41,6 +43,8 @@ class SearchHit:
     source: str
     posted_at: datetime | None
     snippet: str
+    field: str = "other"
+    level: str = "mid"
 
 
 def _filter_sql(filters: SearchFilters, params: dict) -> str:
@@ -69,6 +73,12 @@ def _filter_sql(filters: SearchFilters, params: dict) -> str:
         clauses.append(f"NOT (j.source = :f_xsrc{i} OR j.source LIKE :f_xsrcp{i})")
         params[f"f_xsrc{i}"] = prefix
         params[f"f_xsrcp{i}"] = f"{prefix}:%"
+    if filters.fields:
+        clauses.append("j.field = ANY(:f_fields)")
+        params["f_fields"] = list(filters.fields)
+    if filters.levels:
+        clauses.append("j.level = ANY(:f_levels)")
+        params["f_levels"] = list(filters.levels)
     return " AND ".join(clauses)
 
 
@@ -151,7 +161,7 @@ def hybrid_search(
         )
         SELECT f.id, f.score, f.keyword_rank, f.semantic_rank,
                j.title, j.company, j.location, j.remote, j.url, j.source, j.posted_at,
-               left(j.description, 280) AS snippet
+               j.field, j.level, left(j.description, 280) AS snippet
         FROM fused f
         JOIN jobs j ON j.id = f.id
         ORDER BY f.score DESC, j.posted_at DESC NULLS LAST, f.id
@@ -175,6 +185,8 @@ def hybrid_search(
             source=r.source,
             posted_at=r.posted_at,
             snippet=" ".join(r.snippet.split()),
+            field=r.field,
+            level=r.level,
         )
         for r in rows
     ]
