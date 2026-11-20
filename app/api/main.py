@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_session
 from app.embeddings import Embedder, FastEmbedEmbedder
-from app.llm import AnthropicLLM, StructuredLLM
+from app.llm import StructuredLLM, build_llm
 from app.market.demand import market_read
 from app.models import IngestionRun, Job
 from app.search import SearchFilters, hybrid_search
@@ -43,9 +43,9 @@ EmbedderDep = Annotated[Embedder, Depends(get_embedder)]
 def get_llm(request: Request) -> StructuredLLM:
     if getattr(request.app.state, "llm", None) is None:
         settings = get_settings()
-        if not settings.anthropic_api_key:
-            raise HTTPException(503, "LLM not configured: set JOBPILOT_ANTHROPIC_API_KEY")
-        request.app.state.llm = AnthropicLLM(settings.anthropic_api_key, settings.llm_model)
+        if not settings.llm_api_key:
+            raise HTTPException(503, "LLM not configured: set JOBPILOT_LLM_API_KEY")
+        request.app.state.llm = build_llm(settings.llm_provider, settings.llm_api_key, settings.llm_model)
     return request.app.state.llm
 
 

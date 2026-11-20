@@ -129,3 +129,29 @@ def test_market_read_with_no_matches(indexed, embedder):
 
     read = market_read(indexed, FakeLLM(), embedder, "python", SearchFilters(company="nobody"))
     assert read.sample_size == 0 and read.skills == []
+
+
+def test_gemini_client_parses_and_retries_invalid_json():
+    import httpx
+
+    from app.llm import GeminiLLM
+
+    replies = iter(
+        [
+            '{"skills": [{"name": "Python", "category": "language", "importance": "must"}]}',
+            '{"skills": [{"name": "Python", "category": "language", "importance": "required"}]}',
+        ]
+    )
+    sent = []
+
+    def handler(request):
+        sent.append(request)
+        text = next(replies)
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": text}]}}]})
+
+    llm = GeminiLLM("k", "m", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    out = llm.extract("sys", "job", ExtractedSkills)
+    assert out.skills[0].importance == "required"
+    assert len(sent) == 2  # first answer failed validation and was retried with the error
+    body = sent[0].read().decode()
+    assert "$ref" not in body and '"responseSchema"' in body
