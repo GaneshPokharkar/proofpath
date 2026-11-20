@@ -3,245 +3,396 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ProofPath · find jobs, see what skills they want, check your GitHub</title>
-<meta name="description" content="Search thousands of live jobs and internships, see which skills employers actually ask for, and check how ready your GitHub looks.">
+<title>ProofPath: find a job, learn what it asks for, prove you can do it</title>
+<meta name="description" content="Search thousands of live jobs and internships, see which skills employers actually ask for, and check how ready your GitHub looks for the role you want. Free for students.">
+<meta property="og:title" content="ProofPath">
+<meta property="og:description" content="Find a job, learn what it asks for, prove you can do it. Free for students.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#FAFBFD">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='7' cy='24' r='4' fill='%232952CC'/%3E%3Ccircle cx='25' cy='8' r='4' fill='%2317855A'/%3E%3Cpath d='M7 24 C 7 14, 25 18, 25 8' stroke='%2314213D' stroke-width='2.5' fill='none' stroke-dasharray='3 3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f7f5f0; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6a65; --line: #e6e2d8;
-    --brand: #2f5d50; --brand-soft: #e3eee9; --good: #2e7d4f; --good-soft: #e5f3ea;
-    --warn: #a3541a; --warn-soft: #fbeee2; --radius: 14px;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #151514; --card: #1f1f1d; --ink: #f1efe9; --muted: #a8a69f; --line: #34332f;
-      --brand: #8cc7b2; --brand-soft: #23332d; --good: #7fd09f; --good-soft: #1f3327;
-      --warn: #f0a46c; --warn-soft: #3a2a1d; }
+    color-scheme: light;
+    --paper: #FAFBFD;
+    --surface: #FFFFFF;
+    --ink: #14213D;
+    --ink-2: #4A5672;
+    --ink-3: #7A849A;
+    --line: #DDE3EE;
+    --route: #2952CC;
+    --route-soft: #E8EEFC;
+    --proof: #17855A;
+    --proof-soft: #E3F4EC;
+    --marker: #FFE066;
+    --alert: #B4461B;
+    --alert-soft: #FCEDE6;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-         background: var(--bg); color: var(--ink); }
-  a { color: var(--brand); }
-  .wrap { max-width: 860px; margin: 0 auto; padding: 24px 18px 64px; }
-  header h1 { font-size: 30px; margin: 8px 0 4px; letter-spacing: -0.02em; }
-  header p { color: var(--muted); margin: 0 0 20px; max-width: 60ch; }
-  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-  .tab { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px;
-         padding: 9px 16px; font: inherit; font-size: 15px; cursor: pointer; }
-  .tab[aria-selected="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
-  @media (prefers-color-scheme: dark) { .tab[aria-selected="true"] { color: #10201a; } }
-  .panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
-  .panel h2 { margin: 0 0 4px; font-size: 20px; }
-  .hint { color: var(--muted); margin: 0 0 14px; font-size: 15px; }
-  form { display: flex; gap: 8px; flex-wrap: wrap; }
-  input[type=text] { flex: 1 1 240px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line);
-         background: var(--bg); color: var(--ink); font: inherit; min-width: 0; }
-  button.go { padding: 12px 18px; border: 0; border-radius: 10px; background: var(--brand); color: #fff;
-         font: inherit; font-weight: 600; cursor: pointer; }
-  @media (prefers-color-scheme: dark) { button.go { color: #10201a; } }
-  button.go:disabled { opacity: .6; cursor: progress; }
-  label.check { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 15px; }
-  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 0; }
-  .chip { border: 1px dashed var(--line); background: transparent; color: var(--muted); border-radius: 999px;
-          padding: 4px 11px; font: inherit; font-size: 14px; cursor: pointer; }
-  .chip:hover { color: var(--ink); border-style: solid; }
-  .results { margin-top: 18px; display: grid; gap: 10px; }
-  .job { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-  .job h3 { margin: 0 0 2px; font-size: 17px; }
-  .job .meta { color: var(--muted); font-size: 14px; }
-  .job p { margin: 8px 0 10px; font-size: 14px; color: var(--muted);
-           display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .apply { font-weight: 600; text-decoration: none; }
-  .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px;
-         background: var(--brand-soft); color: var(--brand); margin-left: 6px; vertical-align: 1px; }
-  .note { border-radius: 12px; padding: 12px 14px; margin-top: 16px; font-size: 15px; }
-  .note.info { background: var(--brand-soft); }
-  .note.warn { background: var(--warn-soft); color: var(--warn); }
-  .bar { display: grid; grid-template-columns: minmax(110px, 190px) 1fr auto; gap: 10px; align-items: center;
-         padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
-  .bar:last-child { border-bottom: 0; }
-  .track { height: 10px; background: var(--bg); border-radius: 999px; overflow: hidden; }
-  .fill { height: 100%; background: var(--brand); border-radius: 999px; }
-  .pct { color: var(--muted); font-size: 14px; min-width: 6.5em; text-align: right; }
-  .score { display: flex; align-items: center; gap: 18px; margin: 18px 0 8px; }
-  .score .big { font-size: 44px; font-weight: 700; letter-spacing: -0.03em; }
-  .row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--line); }
-  .row:last-child { border-bottom: 0; }
-  .mark { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; flex: none;
-          font-size: 14px; font-weight: 700; }
-  .yes { background: var(--good-soft); color: var(--good); }
-  .no { background: var(--warn-soft); color: var(--warn); }
-  .small { color: var(--muted); font-size: 13px; }
-  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line);
-             border-top-color: var(--brand); border-radius: 50%; animation: spin .8s linear infinite;
-             vertical-align: -2px; margin-right: 6px; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.6 var(--body); }
+  a { color: var(--route); text-underline-offset: 3px; }
+  :focus-visible { outline: 3px solid var(--route); outline-offset: 2px; border-radius: 6px; }
+  .wrap { width: min(1040px, 100% - 40px); margin-inline: auto; }
+
+  /* Top bar */
+  .bar { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+  .logo { display: flex; align-items: center; gap: 10px; font: 800 21px/1 var(--display); color: var(--ink); text-decoration: none; letter-spacing: -0.02em; }
+  .logo svg { width: 30px; height: 30px; }
+  .bar nav { display: flex; gap: 22px; font-size: 15px; }
+  .bar nav a { color: var(--ink-2); text-decoration: none; }
+  .bar nav a:hover { color: var(--ink); }
+
+  /* Hero: the search box is the hero */
+  .hero { padding: 48px 0 28px; }
+  .hero h1 { font: 800 clamp(38px, 6.2vw, 68px)/1.02 var(--display); letter-spacing: -0.035em; margin: 0; max-width: 15ch; }
+  .hero p.lede { font-size: 19px; color: var(--ink-2); max-width: 54ch; margin: 18px 0 30px; }
+  .search { display: flex; gap: 10px; background: var(--surface); border: 2px solid var(--ink); border-radius: 16px; padding: 8px; max-width: 760px; box-shadow: 6px 6px 0 var(--route-soft); }
+  .search input[type=text] { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: 19px var(--body); color: var(--ink); padding: 10px 12px; }
+  .search input::placeholder { color: var(--ink-3); }
+  .btn { border: 0; border-radius: 11px; background: var(--route); color: #fff; font: 700 17px var(--body); padding: 12px 22px; cursor: pointer; white-space: nowrap; }
+  .btn:hover { background: #1F45B5; }
+  .btn:disabled { opacity: .65; cursor: progress; }
+  .under { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 14px; max-width: 760px; }
+  .try { color: var(--ink-3); font-size: 15px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 5px 12px; font: 15px var(--body); cursor: pointer; }
+  .chip:hover { border-color: var(--route); color: var(--route); }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: var(--ink-2); cursor: pointer; padding: 0 10px; white-space: nowrap; border-left: 1px solid var(--line); }
+  .toggle input { width: 18px; height: 18px; accent-color: var(--route); }
+
+  /* The route: three stops that switch tools */
+  .route { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 46px 0 22px; }
+  .route::before { content: ""; position: absolute; left: 22px; right: calc((100% - 24px) / 3 - 22px); top: 22px; border-top: 2px dashed var(--line); z-index: 0; }
+  .stop { position: relative; z-index: 1; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+  .stop .dot { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 2px solid var(--line); font: 800 18px var(--display); color: var(--ink-3); }
+  .stop strong { display: block; font: 700 19px/1.2 var(--display); margin: 12px 0 2px; letter-spacing: -0.01em; color: var(--ink-2); }
+  .stop .sub { display: block; font-size: 15px; color: var(--ink-3); max-width: 26ch; }
+  .stop[aria-selected="true"] .dot { background: var(--route); border-color: var(--route); color: #fff; }
+  .stop[aria-selected="true"] strong { color: var(--ink); }
+  .stop:hover strong { color: var(--ink); }
+
+  /* Tool panels */
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 26px; }
+  .panel h2 { font: 700 24px/1.2 var(--display); margin: 0 0 4px; letter-spacing: -0.02em; }
+  .panel .hint { color: var(--ink-2); margin: 0 0 18px; max-width: 64ch; }
+  .fields { display: flex; gap: 10px; flex-wrap: wrap; }
+  .field { flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; font-weight: 600; color: var(--ink-2); }
+  .field input { border: 1px solid var(--line); border-radius: 11px; padding: 12px 14px; font: 17px var(--body); color: var(--ink); background: var(--paper); min-width: 0; }
+  .field input:focus { border-color: var(--route); outline: 0; box-shadow: 0 0 0 3px var(--route-soft); }
+  .fields .btn { align-self: flex-end; }
+
+  /* Job rows */
+  .count { color: var(--ink-3); font-size: 15px; margin: 4px 0 6px; }
+  .job { display: grid; grid-template-columns: 46px 1fr auto; gap: 16px; align-items: start; padding: 18px 0; border-top: 1px solid var(--line); }
+  .job:first-of-type { border-top: 0; }
+  .avatar { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; font: 800 19px var(--display); }
+  .job h3 { font: 700 18px/1.3 var(--display); margin: 0; letter-spacing: -0.01em; }
+  .job .where { color: var(--ink-2); font-size: 15px; margin-top: 2px; }
+  .job .where b { color: var(--ink); font-weight: 600; }
+  .job p { margin: 6px 0 0; font-size: 15px; color: var(--ink-3); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .pill { display: inline-block; font-size: 13px; font-weight: 600; padding: 1px 9px; border-radius: 999px; background: var(--proof-soft); color: var(--proof); margin-left: 8px; vertical-align: 2px; }
+  .apply { align-self: center; min-width: 112px; text-align: center; text-decoration: none; font-weight: 700; font-size: 15px; border: 1.5px solid var(--route); border-radius: 10px; padding: 8px 14px; white-space: nowrap; }
+  .apply:hover { background: var(--route); color: #fff; }
+  .apply small { display: block; font-weight: 400; font-size: 12px; color: var(--ink-3); }
+  .apply:hover small { color: #fff; }
+
+  /* Skills bars */
+  .skills { margin-top: 6px; }
+  .skill { display: grid; grid-template-columns: minmax(120px, 210px) 1fr 92px; gap: 14px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+  .skill:first-child { border-top: 0; }
+  .skill .name { font-weight: 600; }
+  .skill .track { height: 12px; background: var(--paper); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+  .skill .fill { display: block; height: 100%; background: var(--route); border-radius: 999px; }
+  .skill .pct { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 15px; }
+  .skill .must { display: block; font-size: 12px; color: var(--ink-3); }
+
+  /* Readiness: the trail of skill dots */
+  .ready-head { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; margin: 22px 0 8px; }
+  .score { font: 800 64px/1 var(--display); letter-spacing: -0.04em; }
+  .score small { font-size: 28px; }
+  .ready-head p { margin: 0; color: var(--ink-2); max-width: 52ch; }
+  .trail { display: flex; align-items: flex-start; flex-wrap: wrap; row-gap: 14px; margin: 22px 0 6px; }
+  .trail .node { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 84px; font-size: 13px; text-align: center; color: var(--ink-2); line-height: 1.25; }
+  .trail .node i { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--ink-3); background: var(--surface); }
+  .trail .node.done i { background: var(--proof); border-color: var(--proof); }
+  .trail .node.todo i { background: var(--marker); border-color: #E0B800; }
+  .trail .link { width: 18px; border-top: 2px dashed var(--line); margin: 10px -8px 0; }
+  .legend { display: flex; gap: 18px; font-size: 14px; color: var(--ink-3); margin: 6px 0 16px; }
+  .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+  .next { background: #FFF8D6; border-radius: 12px; padding: 14px 16px; margin: 12px 0 8px; }
+  .next mark { background: var(--marker); padding: 0 3px; border-radius: 3px; color: var(--ink); }
+  .evidence { margin-top: 8px; }
+  .evidence .row { display: grid; grid-template-columns: 26px 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  .evidence .row:first-child { border-top: 0; }
+  .tick { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+  .tick.yes { background: var(--proof-soft); color: var(--proof); }
+  .tick.no { background: #FFF3C2; color: #8A6A00; }
+  .evidence .muted { color: var(--ink-3); }
+
+  /* Messages */
+  .msg { border-radius: 12px; padding: 14px 16px; margin-top: 18px; font-size: 16px; }
+  .msg.wait { background: var(--route-soft); color: var(--ink); }
+  .msg.err { background: var(--alert-soft); color: var(--alert); }
+  .spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid #C5D2F3; border-top-color: var(--route); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 8px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  footer { margin-top: 28px; color: var(--muted); font-size: 13px; }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+
+  /* How it works + footer */
+  .how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin: 64px 0 0; padding-top: 34px; border-top: 1px solid var(--line); }
+  .how h3 { font: 700 18px var(--display); margin: 0 0 6px; }
+  .how p { margin: 0; color: var(--ink-2); font-size: 16px; }
+  footer { margin: 56px 0 40px; color: var(--ink-3); font-size: 14px; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
   [hidden] { display: none !important; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+  @media (max-width: 720px) {
+    body { font-size: 16px; }
+    .bar nav { display: none; }
+    .hero { padding-top: 22px; }
+    .search { flex-direction: column; box-shadow: 4px 4px 0 var(--route-soft); }
+    .search .btn { width: 100%; }
+    .toggle { border-left: 0; padding: 4px 6px; }
+    .route { grid-template-columns: 1fr; gap: 14px; }
+    .route::before { left: 21px; right: auto; top: 22px; bottom: 22px; border-top: 0; border-left: 2px dashed var(--line); }
+    .stop { display: grid; grid-template-columns: 44px 1fr; column-gap: 14px; align-items: center; }
+    .stop strong { margin: 0; }
+    .stop .sub { grid-column: 2; }
+    .panel { padding: 20px 16px; }
+    .job { grid-template-columns: 40px 1fr; }
+    .avatar { width: 40px; height: 40px; }
+    .apply { grid-column: 2; justify-self: start; }
+    .skill { grid-template-columns: 1fr 74px; }
+    .skill .track { grid-column: 1 / -1; grid-row: 2; }
+    .how { grid-template-columns: 1fr; gap: 20px; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1>ProofPath</h1>
-    <p>Find live jobs and internships, see which skills employers actually ask for, and check how ready your GitHub looks for the role you want.</p>
+  <header class="bar">
+    <a class="logo" href="/" aria-label="ProofPath home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="7" cy="24" r="4" fill="#2952CC"/><circle cx="25" cy="8" r="4" fill="#17855A"/><path d="M7 24 C 7 14, 25 18, 25 8" stroke="#14213D" stroke-width="2.5" fill="none" stroke-dasharray="3 3"/></svg>
+      ProofPath
+    </a>
+    <nav aria-label="Tools">
+      <a href="#tools" data-go="jobs">Find jobs</a>
+      <a href="#tools" data-go="skills">Skills</a>
+      <a href="#tools" data-go="ready">Check my GitHub</a>
+    </nav>
   </header>
 
-  <div class="tabs" role="tablist">
-    <button class="tab" role="tab" aria-selected="true" data-tab="jobs">Find jobs</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="skills">What skills do I need?</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="ready">How ready am I?</button>
+  <section class="hero">
+    <h1>Find the job. Learn what it asks for. Prove you can do it.</h1>
+    <p class="lede">ProofPath searches thousands of live jobs and internships, shows which skills employers ask for most, and checks your GitHub for proof. Free, no sign-up.</p>
+    <form class="search" id="jobs-form" role="search">
+      <label class="sr" for="jobs-q">What job are you looking for?</label>
+      <input type="text" id="jobs-q" placeholder="Role, skill or city, e.g. python intern" autocomplete="off">
+      <label class="toggle"><input type="checkbox" id="jobs-remote"> Remote only</label>
+      <button class="btn" type="submit">Search jobs</button>
+    </form>
+    <div class="under">
+      <span class="try">Try</span>
+      <div class="chips" data-for="jobs-q">
+        <button type="button" class="chip">python intern</button>
+        <button type="button" class="chip">data analyst india</button>
+        <button type="button" class="chip">react developer remote</button>
+        <button type="button" class="chip">machine learning engineer</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="tools">
+    <div class="route" role="tablist" aria-label="Your path">
+      <button class="stop" role="tab" aria-selected="true" aria-controls="jobs" data-tab="jobs">
+        <span class="dot">1</span><strong>Find jobs</strong><span class="sub">Live postings from company job boards, refreshed daily</span>
+      </button>
+      <button class="stop" role="tab" aria-selected="false" aria-controls="skills" data-tab="skills">
+        <span class="dot">2</span><strong>See the skills</strong><span class="sub">What employers ask for in the role you want</span>
+      </button>
+      <button class="stop" role="tab" aria-selected="false" aria-controls="ready" data-tab="ready">
+        <span class="dot">3</span><strong>Prove you're ready</strong><span class="sub">Which of those skills your GitHub already shows</span>
+      </button>
+    </div>
+
+    <section class="panel" id="jobs" role="tabpanel">
+      <h2>Jobs</h2>
+      <div id="jobs-out"><p class="hint">Search above to see live jobs. Every result links to the company's own posting.</p></div>
+    </section>
+
+    <section class="panel" id="skills" role="tabpanel" hidden>
+      <h2>Which skills does this role need?</h2>
+      <p class="hint">We read live postings for the role and count which skills they ask for, so you know what to learn first.</p>
+      <form class="fields" id="skills-form">
+        <label class="field">Role
+          <input type="text" id="skills-q" placeholder="AI engineer intern" autocomplete="off">
+        </label>
+        <button class="btn" type="submit">Show skills</button>
+      </form>
+      <div class="under">
+        <span class="try">Try</span>
+        <div class="chips" data-for="skills-q">
+          <button type="button" class="chip">backend engineer python</button>
+          <button type="button" class="chip">data analyst</button>
+          <button type="button" class="chip">frontend developer</button>
+        </div>
+      </div>
+      <div id="skills-out"></div>
+    </section>
+
+    <section class="panel" id="ready" role="tabpanel" hidden>
+      <h2>How ready is your GitHub?</h2>
+      <p class="hint">We read your own public repos (forks don't count) and look for proof of each skill employers ask for in your target role: the languages you write, the libraries you use, Dockerfiles and CI.</p>
+      <form class="fields" id="ready-form">
+        <label class="field" style="flex-basis:180px">GitHub username
+          <input type="text" id="ready-gh" placeholder="your-username" autocomplete="off" autocapitalize="off" spellcheck="false">
+        </label>
+        <label class="field">Role you want
+          <input type="text" id="ready-role" placeholder="backend engineer python" autocomplete="off">
+        </label>
+        <button class="btn" type="submit">Check my GitHub</button>
+      </form>
+      <div id="ready-out"></div>
+    </section>
   </div>
 
-  <section class="panel" id="jobs">
-    <h2>Find jobs</h2>
-    <p class="hint">Describe what you want in plain words. Role, skill, city, "remote", "intern" all work.</p>
-    <form id="jobs-form">
-      <input type="text" id="jobs-q" placeholder="e.g. python backend intern" aria-label="What kind of job?">
-      <label class="check"><input type="checkbox" id="jobs-remote"> Remote only</label>
-      <button class="go" type="submit">Search</button>
-    </form>
-    <div class="chips" data-for="jobs-q">
-      <button class="chip">python intern</button>
-      <button class="chip">data analyst india</button>
-      <button class="chip">react developer remote</button>
-      <button class="chip">machine learning engineer</button>
-      <button class="chip">devops kubernetes</button>
-    </div>
-    <div class="results" id="jobs-out"></div>
-  </section>
-
-  <section class="panel" id="skills" hidden>
-    <h2>What skills do I need?</h2>
-    <p class="hint">Pick a role. We read live postings for it and count which skills employers ask for, so you know what to learn first.</p>
-    <form id="skills-form">
-      <input type="text" id="skills-q" placeholder="e.g. AI engineer intern" aria-label="Which role?">
-      <button class="go" type="submit">Show skills</button>
-    </form>
-    <div class="chips" data-for="skills-q">
-      <button class="chip">backend engineer python</button>
-      <button class="chip">data analyst</button>
-      <button class="chip">frontend developer</button>
-      <button class="chip">machine learning engineer</button>
-    </div>
-    <div id="skills-out"></div>
-  </section>
-
-  <section class="panel" id="ready" hidden>
-    <h2>How ready am I?</h2>
-    <p class="hint">Enter your GitHub username and the role you want. We check your own public repos (forks don't count) for proof of each skill employers ask for.</p>
-    <form id="ready-form">
-      <input type="text" id="ready-gh" placeholder="GitHub username" aria-label="GitHub username" style="flex-basis:160px">
-      <input type="text" id="ready-role" placeholder="Role, e.g. backend engineer python" aria-label="Role">
-      <button class="go" type="submit">Check</button>
-    </form>
-    <div id="ready-out"></div>
+  <section class="how" aria-label="How ProofPath works">
+    <div><h3>Real postings, not guesses</h3><p>Jobs come straight from company job boards on Greenhouse and Lever, plus Arbeitnow and Remotive. Closed jobs drop out automatically.</p></div>
+    <div><h3>Skills by demand</h3><p>Skill lists are counted across live postings for your role, so "what to learn next" follows what employers are hiring for this month.</p></div>
+    <div><h3>Proof you can show</h3><p>Readiness only counts skills your own code shows. Build the missing ones, push to GitHub, and check again.</p></div>
   </section>
 
   <footer>
-    Jobs come from public job boards (Greenhouse, Lever, Arbeitnow, Remotive) and refresh every day. Every result links to the original posting.
-    <span id="fresh"></span>
+    <span id="fresh">Jobs refresh every day.</span>
+    <span>Every result links to the original posting. ProofPath doesn't store your searches.</span>
   </footer>
 </div>
 
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pct = (x) => Math.round(x * 100);
 
-document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
-  document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === t));
-  ["jobs", "skills", "ready"].forEach(id => $(id).hidden = id !== t.dataset.tab);
-}));
+function showTab(name) {
+  document.querySelectorAll(".stop").forEach(s => s.setAttribute("aria-selected", String(s.dataset.tab === name)));
+  ["jobs", "skills", "ready"].forEach(id => $(id).hidden = id !== name);
+}
+document.querySelectorAll(".stop").forEach(s => s.addEventListener("click", () => showTab(s.dataset.tab)));
+document.querySelectorAll("[data-go]").forEach(a => a.addEventListener("click", () => showTab(a.dataset.go)));
 
 document.querySelectorAll(".chips").forEach(box => box.addEventListener("click", (e) => {
-  if (!e.target.classList.contains("chip")) return;
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
   const input = $(box.dataset.for);
-  input.value = e.target.textContent;
+  input.value = chip.textContent;
   input.form.requestSubmit();
 }));
 
-function loading(out, text) { out.innerHTML = `<div class="note info"><span class="spinner"></span>${esc(text)}</div>`; }
-function problem(out, text) { out.innerHTML = `<div class="note warn">${esc(text)}</div>`; }
+const wait = (out, text) => out.innerHTML = `<div class="msg wait" role="status"><span class="spinner"></span>${esc(text)}</div>`;
+const fail = (out, text) => out.innerHTML = `<div class="msg err" role="alert">${esc(text)}</div>`;
 
 async function getJSON(url) {
   const r = await fetch(url);
   let body = null;
   try { body = await r.json(); } catch (_) {}
-  if (r.status === 503) throw new Error("This feature isn't switched on yet. The site owner still needs to add the AI key. Job search works already.");
-  if (!r.ok) throw new Error((body && (typeof body.detail === "string" ? body.detail : "Please check what you typed.")) || "Something went wrong. Please try again.");
+  if (r.status === 503) throw new Error("This tool isn't switched on yet. Job search already works; skills and GitHub checks open soon.");
+  if (r.status === 502) throw new Error("GitHub didn't answer. Check the username, or try again in a minute.");
+  if (!r.ok) throw new Error(typeof body?.detail === "string" ? body.detail : "Something in the form doesn't look right. Check it and try again.");
   return body;
 }
 
 function ago(iso) {
   if (!iso) return "";
-  const days = Math.floor((Date.now() - new Date(iso)) / 86400000);
-  return days <= 0 ? "today" : days === 1 ? "yesterday" : days < 30 ? `${days} days ago` : `${Math.floor(days / 30)} mo ago`;
+  const d = Math.floor((Date.now() - new Date(iso)) / 86400000);
+  return d <= 0 ? "Posted today" : d === 1 ? "Posted yesterday" : d < 30 ? `Posted ${d} days ago` : d < 60 ? "Posted a month ago" : d < 365 ? `Posted ${Math.floor(d / 30)} months ago` : "Posted over a year ago";
 }
-const sourceName = (s) => ({remotive: "Remotive", arbeitnow: "Arbeitnow"}[s] || (s.startsWith("greenhouse:") ? "Greenhouse" : s.startsWith("lever:") ? "Lever" : s));
+const board = (s) => s.startsWith("greenhouse:") ? "Greenhouse" : s.startsWith("lever:") ? "Lever" : s === "remotive" ? "Remotive" : s === "arbeitnow" ? "Arbeitnow" : s;
+const tints = [["#E8EEFC", "#2952CC"], ["#E3F4EC", "#17855A"], ["#FFF3C2", "#8A6A00"], ["#F3E8FC", "#7A3DB8"], ["#FCEDE6", "#B4461B"]];
+const tint = (name) => tints[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % tints.length];
 
-$("jobs-form").addEventListener("submit", async (e) => {
+async function busy(btn, fn) { if (btn) btn.disabled = true; try { await fn(); } finally { if (btn) btn.disabled = false; } }
+
+$("jobs-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  const q = $("jobs-q").value.trim(), out = $("jobs-out"), btn = e.submitter;
-  if (!q) return problem(out, "Type what kind of job you're looking for first.");
-  btn && (btn.disabled = true);
-  loading(out, "Searching live postings… the first search can take a few seconds.");
-  try {
-    const p = new URLSearchParams({q, limit: 15});
-    if ($("jobs-remote").checked) p.set("remote", "true");
-    const data = await getJSON(`/search?${p}`);
-    if (!data.results.length) return problem(out, "No open jobs match that yet. Try fewer or broader words.");
-    out.innerHTML = data.results.map(j => `
-      <article class="job">
-        <h3>${esc(j.title)}${j.remote ? '<span class="tag">Remote</span>' : ""}</h3>
-        <div class="meta">${esc(j.company)}${j.location ? " · " + esc(j.location) : ""}${j.posted_at ? " · " + ago(j.posted_at) : ""}</div>
-        <p>${esc(j.snippet)}</p>
-        <a class="apply" href="${esc(j.url)}" target="_blank" rel="noopener">View and apply →</a>
-        <span class="small"> via ${esc(sourceName(j.source))}</span>
-      </article>`).join("");
-  } catch (err) { problem(out, err.message); }
-  finally { btn && (btn.disabled = false); }
+  const q = $("jobs-q").value.trim(), out = $("jobs-out");
+  showTab("jobs");
+  if (!q) { $("jobs-q").focus(); return fail(out, "Type the kind of job you want, like “data analyst” or “react intern remote”."); }
+  busy(e.submitter, async () => {
+    wait(out, "Searching live postings. The first search of the day takes a few seconds.");
+    try {
+      const p = new URLSearchParams({q, limit: 20});
+      if ($("jobs-remote").checked) p.set("remote", "true");
+      const d = await getJSON(`/search?${p}`);
+      if (!d.results.length) return fail(out, "No open jobs match that yet. Try fewer words, or a broader role like “developer”.");
+      requestAnimationFrame(() => $("jobs").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"}));
+      out.innerHTML = `<p class="count">${d.results.length} jobs for “${esc(q)}”, best matches first</p>` + d.results.map(j => {
+        const [bg, fg] = tint(j.company);
+        return `<article class="job">
+          <div class="avatar" style="background:${bg};color:${fg}" aria-hidden="true">${esc(j.company.trim()[0] || "?")}</div>
+          <div><h3>${esc(j.title)}${j.remote ? '<span class="pill">Remote</span>' : ""}</h3>
+            <div class="where"><b>${esc(j.company)}</b>${j.location ? `, ${esc(j.location)}` : ""}</div>
+            <div class="where">${ago(j.posted_at)}</div>
+            <p>${esc(j.snippet)}</p></div>
+          <a class="apply" href="${esc(j.url)}" target="_blank" rel="noopener">Apply<small>on ${esc(board(j.source))}</small></a>
+        </article>`; }).join("");
+    } catch (err) { fail(out, err.message); }
+  });
 });
 
-$("skills-form").addEventListener("submit", async (e) => {
+$("skills-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  const role = $("skills-q").value.trim(), out = $("skills-out"), btn = e.submitter;
-  if (!role) return problem(out, "Type a role first, e.g. data analyst.");
-  btn && (btn.disabled = true);
-  loading(out, "Reading live job postings for this role… this takes up to a minute the first time.");
-  try {
-    const data = await getJSON(`/market?${new URLSearchParams({role, sample: 20})}`);
-    if (!data.skills.length) return problem(out, "Not enough postings for that role yet. Try a more common name for it.");
-    out.innerHTML = `<p class="hint" style="margin-top:16px">From <b>${data.sample_size}</b> live postings for <b>${esc(role)}</b>. The longer the bar, the more employers ask for it.</p>` +
-      data.skills.slice(0, 15).map(s => `
-        <div class="bar"><span>${esc(s.skill)}</span>
-          <span class="track"><span class="fill" style="width:${Math.round(s.share * 100)}%"></span></span>
-          <span class="pct">${Math.round(s.share * 100)}%${s.required ? ` · ${s.required} must` : ""}</span></div>`).join("");
-  } catch (err) { problem(out, err.message); }
-  finally { btn && (btn.disabled = false); }
+  const role = $("skills-q").value.trim(), out = $("skills-out");
+  if (!role) { $("skills-q").focus(); return fail(out, "Type a role first, like “data analyst”."); }
+  busy(e.submitter, async () => {
+    wait(out, "Reading live postings for this role. The first time can take up to a minute.");
+    try {
+      const d = await getJSON(`/market?${new URLSearchParams({role, sample: 20})}`);
+      if (!d.skills.length) return fail(out, "Not enough postings for that role yet. Try a more common name for it.");
+      out.innerHTML = `<p class="count" style="margin-top:20px">Counted across ${d.sample_size} live postings for “${esc(role)}”</p>
+        <div class="skills">${d.skills.slice(0, 15).map(s => `
+          <div class="skill"><span class="name">${esc(s.skill)}</span>
+            <span class="track" role="img" aria-label="${pct(s.share)} percent of postings"><span class="fill" style="width:${pct(s.share)}%"></span></span>
+            <span class="pct">${pct(s.share)}%<span class="must">${s.required ? `${s.required} must-have` : "nice to have"}</span></span></div>`).join("")}</div>
+        <p class="hint" style="margin-top:18px">Next: <a href="#tools" id="to-ready">check which of these your GitHub already shows</a>.</p>`;
+      $("to-ready").addEventListener("click", () => { $("ready-role").value = role; showTab("ready"); $("ready-gh").focus(); });
+    } catch (err) { fail(out, err.message); }
+  });
 });
 
-$("ready-form").addEventListener("submit", async (e) => {
+$("ready-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  const github = $("ready-gh").value.trim().replace(/^@/, "").replace(/^https?:\/\/github\.com\//, "").replace(/\/.*$/, "");
-  const role = $("ready-role").value.trim(), out = $("ready-out"), btn = e.submitter;
-  if (!github || !role) return problem(out, "Enter both your GitHub username and the role you want.");
-  btn && (btn.disabled = true);
-  loading(out, "Reading your repos and live postings… this can take up to a minute.");
-  try {
-    const d = await getJSON(`/readiness?${new URLSearchParams({github, role})}`);
-    const missing = d.skills.filter(s => !s.proven).slice(0, 3).map(s => s.skill);
-    out.innerHTML = `
-      <div class="score"><div class="big">${Math.round(d.score * 100)}%</div>
-        <div>ready for <b>${esc(role)}</b><br><span class="small">${d.repos_checked} repos checked · ${d.sample_size} postings read · weighted by how often employers ask for each skill</span></div></div>
-      ${missing.length ? `<div class="note info">Learn next: <b>${missing.map(esc).join("</b>, <b>")}</b>. Build a small project with each and push it to GitHub, then check again.</div>` : ""}
-      <div style="margin-top:12px">${d.skills.slice(0, 15).map(s => `
-        <div class="row"><span class="mark ${s.proven ? "yes" : "no"}">${s.proven ? "✓" : "✗"}</span>
-          <div><b>${esc(s.skill)}</b> <span class="small">· ${Math.round(s.demand_share * 100)}% of postings</span><br>
-          <span class="small">${s.proven ? "Found in " + s.repos.map(r => `<a href="https://github.com/${esc(r)}" target="_blank" rel="noopener">${esc(r.split("/")[1])}</a>`).join(", ") : "No proof in your repos yet"}</span></div></div>`).join("")}</div>`;
-  } catch (err) { problem(out, err.message); }
-  finally { btn && (btn.disabled = false); }
+  const github = $("ready-gh").value.trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?github\.com\//, "").replace(/\/.*$/, "");
+  const role = $("ready-role").value.trim(), out = $("ready-out");
+  if (!github || !role) return fail(out, "Enter your GitHub username and the role you want.");
+  busy(e.submitter, async () => {
+    wait(out, "Reading your repos and live postings. This can take up to a minute.");
+    try {
+      const d = await getJSON(`/readiness?${new URLSearchParams({github, role})}`);
+      const skills = d.skills.slice(0, 12);
+      const missing = d.skills.filter(s => !s.proven).slice(0, 3).map(s => s.skill);
+      out.innerHTML = `
+        <div class="ready-head"><div class="score">${pct(d.score)}<small>%</small></div>
+          <p>of what employers ask for in <b>${esc(role)}</b> is proven in your GitHub. Checked ${d.repos_checked} of your repos against ${d.sample_size} live postings; common skills count for more.</p></div>
+        <div class="trail" aria-label="Skills employers ask for, most wanted first">${skills.map((s, i) =>
+          `${i ? '<span class="link" aria-hidden="true"></span>' : ""}<span class="node ${s.proven ? "done" : "todo"}"><i></i>${esc(s.skill)}</span>`).join("")}</div>
+        <div class="legend"><span><i style="background:#17855A"></i>Proven in your repos</span><span><i style="background:#FFE066;border:1px solid #E0B800"></i>Still to learn</span></div>
+        ${missing.length ? `<div class="next">Learn next: ${missing.map(m => `<mark>${esc(m)}</mark>`).join(", ")}. Build one small project that uses them, push it to GitHub, then check again.</div>` : `<div class="next">Every skill on the list is proven. Time to apply.</div>`}
+        <div class="evidence">${skills.map(s => `
+          <div class="row"><span class="tick ${s.proven ? "yes" : "no"}">${s.proven ? "✓" : "!"}</span>
+            <div><b>${esc(s.skill)}</b> <span class="muted">asked for in ${pct(s.demand_share)}% of postings</span><br>
+            ${s.proven ? `<span class="muted">Found in </span>${s.repos.map(r => `<a href="https://github.com/${esc(r)}" target="_blank" rel="noopener">${esc(r.split("/")[1])}</a>`).join(", ")}` : '<span class="muted">No proof in your repos yet</span>'}</div></div>`).join("")}</div>`;
+    } catch (err) { fail(out, err.message); }
+  });
 });
 
 fetch("/admin/status").then(r => r.ok ? r.json() : null).then(s => {
-  if (s && s.last_refresh) $("fresh").textContent = `Last updated ${ago(s.last_refresh)}.`;
+  if (!s?.last_refresh) return;
+  const h = Math.floor((Date.now() - new Date(s.last_refresh)) / 3600000);
+  $("fresh").textContent = h < 1 ? "Jobs updated less than an hour ago." : h < 24 ? `Jobs updated ${h} hour${h > 1 ? "s" : ""} ago.` : `Jobs updated ${Math.floor(h / 24)} day${h >= 48 ? "s" : ""} ago.`;
 }).catch(() => {});
 </script>
 </body>

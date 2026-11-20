@@ -123,7 +123,7 @@ def client(session, embedder, monkeypatch):
 
 def test_pages_render(client):
     home = client.get("/")
-    assert home.status_code == 200 and "How ready am I?" in home.text
+    assert home.status_code == 200 and "Prove you're ready" in home.text
     assert "Admin password" in client.get("/admin").text
 
 
