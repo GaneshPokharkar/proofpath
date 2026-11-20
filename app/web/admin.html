@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>ProofPath admin</title>
+<style>
+  body { margin: 0; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f7f5f0; color: #1d1d1b; }
+  @media (prefers-color-scheme: dark) { body { background: #151514; color: #f1efe9; } .card { background: #1f1f1d !important; border-color: #34332f !important; } input { background: #151514; color: inherit; } }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 28px 18px; }
+  .card { background: #fff; border: 1px solid #e6e2d8; border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+  h1 { font-size: 24px; margin: 0 0 14px; } h2 { font-size: 17px; margin: 0 0 8px; }
+  input { width: 100%; box-sizing: border-box; padding: 11px 12px; border-radius: 10px; border: 1px solid #e6e2d8; font: inherit; }
+  button { padding: 10px 14px; border: 0; border-radius: 10px; background: #2f5d50; color: #fff; font: inherit; font-weight: 600; cursor: pointer; margin: 8px 8px 0 0; }
+  button.secondary { background: transparent; color: inherit; border: 1px solid #b9b5aa; }
+  ul { margin: 0; padding-left: 20px; } .ok { color: #2e7d4f; } .no { color: #a3541a; }
+  pre { white-space: pre-wrap; font-size: 14px; margin: 10px 0 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ProofPath admin</h1>
+
+  <div class="card">
+    <h2>Setup status</h2>
+    <ul id="status"><li>Loading…</li></ul>
+    <p style="font-size:14px;margin:10px 0 0">Missing items are added in Vercel → proofpath → Settings → Environment Variables, then redeploy.</p>
+  </div>
+
+  <div class="card">
+    <h2>Admin password</h2>
+    <input type="password" id="pw" placeholder="The value of ADMIN_SECRET" autocomplete="current-password">
+  </div>
+
+  <div class="card">
+    <h2>Jobs</h2>
+    <p style="margin:0;font-size:15px">Refresh runs automatically every day. "Refresh now" skips if the last refresh was under 6 hours ago; "Force" always runs.</p>
+    <button id="refresh">Refresh now</button><button id="force" class="secondary">Force refresh</button>
+    <pre id="refresh-out"></pre>
+  </div>
+
+  <div class="card">
+    <h2>Telegram bot</h2>
+    <p style="margin:0;font-size:15px">After adding TELEGRAM_BOT_TOKEN, click once to connect the bot to this site.</p>
+    <button id="tg">Connect Telegram bot</button>
+    <pre id="tg-out"></pre>
+  </div>
+</div>
+<script>
+const labels = { ai_key: "AI key (skills and readiness)", admin_password: "Admin password", cron_secret: "Cron secret (optional)",
+  telegram_bot: "Telegram bot token", telegram_admins: "Telegram admin usernames", github_token: "GitHub token (optional, more checks per hour)" };
+fetch("/admin/status").then(r => r.json()).then(s => {
+  document.getElementById("status").innerHTML =
+    `<li>Last refresh: <b>${s.last_refresh ? new Date(s.last_refresh).toLocaleString() : "never"}</b></li>` +
+    Object.entries(s.configured).map(([k, v]) => `<li class="${v ? "ok" : "no"}">${v ? "✓" : "○"} ${labels[k] || k}${v ? "" : " (not set yet)"}</li>`).join("");
+});
+async function call(path, out) {
+  const el = document.getElementById(out);
+  el.textContent = "Working… (a refresh can take a minute)";
+  try {
+    const r = await fetch(path, { method: "POST", headers: { Authorization: "Bearer " + document.getElementById("pw").value } });
+    const body = await r.json();
+    el.textContent = r.ok ? JSON.stringify(body, null, 2) : (body.detail || "Failed");
+  } catch (e) { el.textContent = "Failed: " + e.message; }
+}
+document.getElementById("refresh").onclick = () => call("/admin/refresh", "refresh-out");
+document.getElementById("force").onclick = () => call("/admin/refresh?force=true", "refresh-out");
+document.getElementById("tg").onclick = () => call("/admin/telegram/setup", "tg-out");
+</script>
+</body>
+</html>

@@ -37,6 +37,28 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     llm_model: str = "gemini-flash-lite-latest"
 
+    # Secrets below are optional placeholders: each feature reports "not set up yet" until its
+    # value exists. They read the plain names used in the Vercel dashboard.
+    # ADMIN_SECRET guards /admin (refresh button); Vercel Cron sends CRON_SECRET automatically.
+    admin_secret: str | None = Field(
+        None, validation_alias=AliasChoices("JOBPILOT_ADMIN_SECRET", "ADMIN_SECRET")
+    )
+    cron_secret: str | None = Field(
+        None, validation_alias=AliasChoices("JOBPILOT_CRON_SECRET", "CRON_SECRET")
+    )
+    telegram_bot_token: str | None = Field(
+        None, validation_alias=AliasChoices("JOBPILOT_TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN")
+    )
+    # Comma-separated Telegram usernames (without @) allowed to run /refresh.
+    telegram_admins: str = Field(
+        "", validation_alias=AliasChoices("JOBPILOT_TELEGRAM_ADMINS", "TELEGRAM_ADMINS")
+    )
+    github_token: str | None = Field(
+        None, validation_alias=AliasChoices("JOBPILOT_GITHUB_TOKEN", "GITHUB_TOKEN")
+    )
+    # A refresh within this many hours of the last successful one is skipped unless forced.
+    refresh_cooldown_hours: float = 6.0
+
     # Hybrid search tuning.
     search_candidates: int = 100  # candidates taken from each retriever before fusion
     rrf_k: int = 60  # standard reciprocal-rank-fusion constant

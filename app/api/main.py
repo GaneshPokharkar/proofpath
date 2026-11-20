@@ -1,10 +1,14 @@
-"""HTTP API. Phase 1 exposes search; the chat agent arrives in phase 2."""
+"""HTTP API and web pages for ProofPath."""
 
+import hashlib
+import secrets
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import distinct_on
@@ -237,3 +241,223 @@ def market(
         sample_size=read.sample_size,
         skills=[SkillDemandOut(**vars(s)) for s in read.skills],
     )
+
+
+# --- Readiness: market demand vs. a student's GitHub evidence --------------------------------
+
+
+class CoverageOut(BaseModel):
+    skill: str
+    demand_share: float
+    required: int
+    proven: bool
+    repos: list[str]
+    details: list[str]
+
+
+class ReadinessResponse(BaseModel):
+    github: str
+    role: str
+    score: float
+    repos_checked: int
+    sample_size: int
+    skills: list[CoverageOut]
+
+
+@app.get("/readiness", response_model=ReadinessResponse)
+def readiness_endpoint(
+    session: SessionDep,
+    embedder: EmbedderDep,
+    llm: LLMDep,
+    github: Annotated[str, Query(min_length=1, max_length=39, pattern=r"^[A-Za-z0-9-]+$")],
+    role: Annotated[str, Query(min_length=2, max_length=120)],
+    sample: Annotated[int, Query(ge=5, le=40)] = 20,
+) -> ReadinessResponse:
+    """How ready a GitHub profile looks for a role: each skill employers ask for, and whether
+    the student's own (non-fork) repos show evidence of it."""
+    import httpx
+
+    from app.evidence.collect import analyze_student, readiness
+    from app.evidence.github import GitHubClient, GitHubError
+
+    settings = get_settings()
+    with httpx.Client(timeout=20) as http:
+        try:
+            summary = analyze_student(session, GitHubClient(http, settings.github_token), embedder, github)
+        except GitHubError as exc:
+            raise HTTPException(502, str(exc)) from exc
+    read = market_read(session, llm, embedder, role, sample=sample)
+    result = readiness(session, github, read)
+    return ReadinessResponse(
+        github=github,
+        role=role,
+        score=result.score,
+        repos_checked=summary.repos - summary.forks_skipped,
+        sample_size=read.sample_size,
+        skills=[CoverageOut(**vars(c)) for c in result.skills],
+    )
+
+
+# --- Refresh: admin page, daily cron, Telegram --------------------------------------------
+
+
+def _require_admin(request: Request) -> None:
+    settings = get_settings()
+    if not settings.admin_secret:
+        raise HTTPException(503, "Admin is not set up yet: add ADMIN_SECRET in the Vercel settings")
+    supplied = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+    if not secrets.compare_digest(supplied, settings.admin_secret):
+        raise HTTPException(401, "Wrong admin password")
+
+
+def _refresh(request: Request, force: bool):
+    from app.refresh import run_refresh
+
+    return run_refresh(get_embedder(request), force=force)
+
+
+@app.post("/admin/refresh")
+def admin_refresh(request: Request, force: bool = False) -> dict:
+    _require_admin(request)
+    return vars(_refresh(request, force))
+
+
+@app.get("/cron/daily")
+def cron_daily(request: Request) -> dict:
+    """Called by Vercel Cron once a day: refresh jobs, then send Telegram alerts.
+
+    Vercel sends `Authorization: Bearer $CRON_SECRET` when CRON_SECRET is set. Until it is, the
+    call is accepted from Vercel's cron user agent; the refresh cooldown limits any abuse."""
+    settings = get_settings()
+    supplied = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+    allowed = [s for s in (settings.cron_secret, settings.admin_secret) if s]
+    if allowed:
+        if not any(secrets.compare_digest(supplied, s) for s in allowed):
+            raise HTTPException(401, "Not authorised")
+    elif not request.headers.get("user-agent", "").startswith("vercel-cron"):
+        raise HTTPException(401, "Not authorised")
+
+    result = vars(_refresh(request, force=False))
+    result["alerts_sent"] = _send_alerts(request)
+    return result
+
+
+def _send_alerts(request: Request) -> int:
+    from app.db import session_scope
+    from app.telegram.bot import TelegramClient, build_alerts
+
+    token = get_settings().telegram_bot_token
+    if not token:
+        return 0
+    client = TelegramClient(token)
+    sent = 0
+    with session_scope() as session:
+        for chat_id, message in build_alerts(session, get_embedder(request)):
+            try:
+                client.send(chat_id, message)
+                sent += 1
+            except RuntimeError:
+                pass  # a user who blocked the bot must not stop everyone else's alerts
+    return sent
+
+
+@app.get("/admin/status")
+def admin_status(session: SessionDep) -> dict:
+    """What is configured, and when jobs were last refreshed (no secrets are revealed)."""
+    from app.refresh import last_success
+
+    s = get_settings()
+    last = last_success(session)
+    return {
+        "last_refresh": last,
+        "configured": {
+            "ai_key": bool(s.llm_api_key),
+            "admin_password": bool(s.admin_secret),
+            "cron_secret": bool(s.cron_secret),
+            "telegram_bot": bool(s.telegram_bot_token),
+            "telegram_admins": bool(s.telegram_admins),
+            "github_token": bool(s.github_token),
+        },
+    }
+
+
+# --- Telegram webhook --------------------------------------------------------------------
+
+
+def _webhook_secret(token: str) -> str:
+    # Telegram echoes this in X-Telegram-Bot-Api-Secret-Token, proving a request came from it.
+    return hashlib.sha256(f"proofpath:{token}".encode()).hexdigest()[:48]
+
+
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request) -> dict:
+    from app.db import session_scope
+    from app.telegram.bot import Deps, TelegramClient, handle_update
+
+    s = get_settings()
+    if not s.telegram_bot_token:
+        raise HTTPException(503, "Telegram bot is not set up yet: add TELEGRAM_BOT_TOKEN")
+    if request.headers.get("x-telegram-bot-api-secret-token") != _webhook_secret(s.telegram_bot_token):
+        raise HTTPException(401, "Not from Telegram")
+    update = await request.json()
+
+    llm = None
+    if s.llm_api_key:
+        llm = getattr(request.app.state, "llm", None) or build_llm(s.llm_provider, s.llm_api_key, s.llm_model)
+        request.app.state.llm = llm
+
+    with session_scope() as session:
+        deps = Deps(
+            session=session,
+            embedder_factory=lambda: get_embedder(request),
+            admins={a.strip().lstrip("@").lower() for a in s.telegram_admins.split(",") if a.strip()},
+            refresh=lambda force: _refresh(request, force),
+            market=(lambda role: market_read(session, llm, get_embedder(request), role, sample=20))
+            if llm
+            else None,
+        )
+        reply = handle_update(update, deps)
+    if reply:
+        TelegramClient(s.telegram_bot_token).send(*reply)
+    return {"ok": True}  # Telegram retries anything that is not a 200
+
+
+@app.post("/admin/telegram/setup")
+def telegram_setup(request: Request) -> dict:
+    """Point the bot's webhook at this deployment (run once after adding TELEGRAM_BOT_TOKEN)."""
+    from app.telegram.bot import TelegramClient
+
+    _require_admin(request)
+    s = get_settings()
+    if not s.telegram_bot_token:
+        raise HTTPException(503, "Add TELEGRAM_BOT_TOKEN in the Vercel settings first")
+    url = str(request.base_url).rstrip("/").replace("http://", "https://") + "/telegram/webhook"
+    client = TelegramClient(s.telegram_bot_token)
+    client.call(
+        "setWebhook", url=url, secret_token=_webhook_secret(s.telegram_bot_token), allowed_updates=["message"]
+    )
+    client.call(
+        "setMyCommands",
+        commands=[
+            {"command": "jobs", "description": "Search live jobs"},
+            {"command": "skills", "description": "Skills employers ask for in a role"},
+            {"command": "alerts", "description": "Daily new-job alerts"},
+            {"command": "help", "description": "How to use ProofPath"},
+        ],
+    )
+    return {"webhook": url, "bot": client.call("getMe").get("username")}
+
+
+# --- Web pages ---------------------------------------------------------------------------
+
+_WEB = Path(__file__).resolve().parent.parent / "web"
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def home() -> str:
+    return (_WEB / "index.html").read_text()
+
+
+@app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
+def admin_page() -> str:
+    return (_WEB / "admin.html").read_text()
