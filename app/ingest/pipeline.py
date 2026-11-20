@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 import httpx
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -17,7 +17,7 @@ from app.embeddings import Embedder
 from app.ingest.base import JobPosting, Source
 from app.ingest.classify import classify_field, classify_level
 from app.ingest.deadline import find_apply_by
-from app.models import IngestionRun, Job, JobEmbedding
+from app.models import DEDUPE_SQL, IngestionRun, Job, JobEmbedding
 
 log = logging.getLogger(__name__)
 
@@ -78,6 +78,28 @@ def _row(posting: JobPosting, source_key: str, now: datetime) -> dict:
     }
 
 
+_KEY_FROM_PARAMS = (
+    DEDUPE_SQL.replace("company", "CAST(:company AS text)")
+    .replace("title", "CAST(:title AS text)")
+    .replace("coalesce(location", "coalesce(CAST(:location AS text)")
+)
+
+
+def _listed_elsewhere(session, row: dict, source_key: str) -> bool:
+    return (
+        session.execute(
+            text(f"SELECT 1 FROM jobs WHERE dedupe_key = {_KEY_FROM_PARAMS} AND source <> :src LIMIT 1"),
+            {
+                "company": row["company"],
+                "title": row["title"],
+                "location": row.get("location"),
+                "src": source_key,
+            },
+        ).first()
+        is not None
+    )
+
+
 def sync_postings(
     session: Session,
     source: Source,
@@ -109,6 +131,8 @@ def sync_postings(
         row = _row(posting, source.key, now)
         current = existing.get(posting.external_id)
         if current is None:
+            if _listed_elsewhere(session, row, source.key):
+                continue  # one copy per job: another board already has this company + title + place
             job_id = session.execute(pg_insert(Job).values(**row).returning(Job.id)).scalar_one()
             stats.inserted += 1
             to_embed.append((job_id, posting))

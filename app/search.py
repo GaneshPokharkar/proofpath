@@ -162,22 +162,21 @@ def hybrid_search(
             ) ranked
             GROUP BY id
         )
-        SELECT f.id, f.score, f.keyword_rank, f.semantic_rank,
-               j.title, j.company, j.location, j.remote, j.url, j.source, j.posted_at,
-               j.field, j.level, j.apply_by, j.last_seen_at, left(j.description, 280) AS snippet
-        FROM fused f
-        JOIN jobs j ON j.id = f.id
-        ORDER BY f.score DESC, j.posted_at DESC NULLS LAST, f.id
+        SELECT * FROM (
+            SELECT DISTINCT ON (j.dedupe_key) f.id, f.score, f.keyword_rank, f.semantic_rank,
+                   j.title, j.company, j.location, j.remote, j.url, j.source, j.posted_at,
+                   j.field, j.level, j.apply_by, j.last_seen_at, left(j.description, 280) AS snippet
+            FROM fused f
+            JOIN jobs j ON j.id = f.id
+            ORDER BY j.dedupe_key, f.score DESC, f.id
+        ) one_per_job  -- the same job on two boards is shown once
+        ORDER BY score DESC, posted_at DESC NULLS LAST, id
         LIMIT :limit
         """
     )
     # More HNSW candidates than the default 40, so filtered vector queries still fill `candidates`.
     session.execute(text("SET LOCAL hnsw.ef_search = 200"))
     rows = session.execute(sql, params).all()
-    if rows:  # these jobs were searched: keep them (see app/retention.py)
-        session.execute(
-            text("UPDATE jobs SET last_served_at = now() WHERE id = ANY(:ids)"), {"ids": [r.id for r in rows]}
-        )
     return [
         SearchHit(
             job_id=r.id,

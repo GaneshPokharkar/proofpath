@@ -31,7 +31,7 @@ def _job(session, ext, seen, served, active=True):
         {"e": ext, "h": ext, "s": seen, "v": served, "a": active})
 
 
-def test_only_searched_jobs_survive(session):
+def test_jobs_are_never_deleted(session):
     now = datetime.now(UTC)
     old = now - timedelta(days=2)
     session.execute(text("""INSERT INTO ingestion_runs (source, started_at, finished_at, status)
@@ -43,4 +43,4 @@ def test_only_searched_jobs_survive(session):
     session.commit()
     purge(session, now)
     left = set(session.execute(text("SELECT external_id FROM jobs WHERE source='t'")).scalars())
-    assert left == {"searched", "today"}
+    assert left == {"searched", "searched_closed", "ignored", "today"}

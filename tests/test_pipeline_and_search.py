@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.ingest.base import JobPosting
 from app.ingest.pipeline import sync_postings
@@ -213,3 +213,33 @@ def test_search_filters_by_field_and_level(session, embedder):
     assert {h.title for h in data} == {"Data Analyst Intern", "Senior Data Engineer"}
     interns = hybrid_search(session, embedder, "python", SearchFilters(levels=("intern", "entry")))
     assert [h.title for h in interns] == ["Data Analyst Intern"] and interns[0].field == "data_ai"
+
+
+def test_same_job_on_two_boards_is_stored_once(session, embedder):
+    from datetime import UTC, datetime, timedelta
+
+    from app.ingest.base import JobPosting
+    from app.ingest.pipeline import sync_postings
+
+    class Src:
+        def __init__(self, key):
+            self.key, self.full_snapshot = key, True
+
+    def post(ext):
+        return JobPosting(
+            external_id=ext,
+            title="Data Analyst Intern",
+            company="Acme Corp.",
+            location="Pune",
+            url="http://x/" + ext,
+            description="SQL and Excel.",
+            posted_at=None,
+            remote=False,
+        )
+
+    now = datetime.now(UTC)
+    sync_postings(session, Src("board_a"), [post("a1")], embedder, now, timedelta(days=14))
+    stats = sync_postings(session, Src("board_b"), [post("b1")], embedder, now, timedelta(days=14))
+    assert stats.inserted == 0
+    n = session.execute(text("SELECT count(*) FROM jobs WHERE company = 'Acme Corp.'")).scalar()
+    assert n == 1

@@ -33,6 +33,9 @@ ignore = ["B008"]  # FastAPI's Depends()/Query() in defaults is the intended pat
 [tool.ruff.lint.per-file-ignores]
 "app/ingest/classify.py" = ["E501"]
 "app/ingest/deadline.py" = ["E501"]  # one regex rule per line reads better than wrapped fragments
+"app/models.py" = ["E501"]  # the dedupe SQL expression
+"app/api/main.py" = ["E501"]
+"migrations/versions/0008_dedupe_key.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

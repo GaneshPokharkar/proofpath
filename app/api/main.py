@@ -32,8 +32,19 @@ async def _lifespan(_app):
 
         with get_engine().begin() as conn:
             conn.execute(text("SET LOCAL lock_timeout = '3s'"))
+            conn.execute(text("SET LOCAL statement_timeout = '60s'"))
             conn.execute(text("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS last_served_at TIMESTAMPTZ"))
-            conn.execute(text("UPDATE alembic_version SET version_num = '0007' WHERE version_num = '0006'"))
+            from app.models import DEDUPE_SQL
+
+            conn.execute(
+                text(
+                    f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS dedupe_key TEXT GENERATED ALWAYS AS ({DEDUPE_SQL}) STORED"
+                )
+            )
+            conn.execute(text("CREATE INDEX IF NOT EXISTS jobs_dedupe_key ON jobs (dedupe_key)"))
+            conn.execute(
+                text("UPDATE alembic_version SET version_num = '0008' WHERE version_num IN ('0006', '0007')")
+            )
     except Exception:  # noqa: BLE001 - never block start-up; search reports its own errors
         pass
     yield
@@ -47,6 +58,7 @@ async def _needs_key(_request: Request, _exc: NeedsKey):
     from fastapi.responses import JSONResponse
 
     return JSONResponse(status_code=503, content={"detail": "Add your Gemini key to analyse this role"})
+
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
