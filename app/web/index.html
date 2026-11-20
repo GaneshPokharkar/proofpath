@@ -343,6 +343,17 @@
       </form>
       <div id="ready-out"></div>
     </section>
+
+    <section class="chatbox" aria-labelledby="chat-h">
+      <h2 id="chat-h">Ask ProofPath</h2>
+      <p class="hint">Say what you want in your own words: “remote data internships, I know Python and SQL”, “compare the first two”, “save that one”, “is it a fit for me?”. It remembers your skills, places and shortlist on this device for a day; <button type="button" class="linkbtn" id="chat-forget">forget me</button>.</p>
+      <div id="chat-log" class="chat-log" aria-live="polite"></div>
+      <form id="chat-form" class="chat-form">
+        <input id="chat-in" type="text" maxlength="1000" autocomplete="off" placeholder="e.g. python internships in Pune or remote" aria-label="Message">
+        <button class="btn" type="submit">Send</button>
+      </form>
+      <p class="memline" id="chat-mem"></p>
+    </section>
   </div>
 
   <section class="how" aria-label="How ProofPath works">
@@ -520,6 +531,28 @@ function ideasHTML(projects) {
     <div class="bullet"><b>Add this once it's built. Replace anything in [brackets] with what you measure.</b><span id="mbullet-${i}">${esc(p.resume_bullet)}</span>
       <br><button type="button" class="copy" data-copy="mbullet-${i}">Copy bullet</button></div></article>`).join("");
 }
+function tailorFor(jobId, btn) {
+  const file = $("resume-file").files[0], out = $("tailor-out");
+  if (!file) return fail(out, "Choose your resume file first.");
+  busy(btn, async () => {
+    wait(out, "Rewriting, fact-checking each line and building your PDF. About a minute.");
+    try {
+      const fd = new FormData(); fd.append("resume", file); fd.append("job_id", jobId);
+      const r = await fetch("/resume/tailor", {method: "POST", body: fd, headers: aiHeaders()});
+      let d = null; try { d = await r.json(); } catch (_) {}
+      if (r.status === 503) throw new Error(NEED_KEY);
+      if (!r.ok) throw new Error(typeof d?.detail === "string" ? d.detail : "That didn't work. Try again.");
+      const kept = d.lines.filter(l => l.accepted), dropped = d.lines.filter(l => !l.accepted);
+      const pdfLink = d.pdf_base64 ? `<a class="btn" download="resume-${d.job_id}.pdf" href="data:application/pdf;base64,${d.pdf_base64}">Download PDF</a> ` : "";
+      const texLink = `<a class="linkbtn" download="resume-${d.job_id}.tex" href="data:text/plain;charset=utf-8,${encodeURIComponent(d.tex)}">LaTeX source</a>`;
+      out.innerHTML = `<p style="margin-top:14px">Job skills visible in your resume: <b>${pct(d.coverage_before)}% → ${pct(d.coverage_after)}%</b>. ${d.pages ? `${d.pages} page.` : ""}</p>
+        <p>${pdfLink}${texLink}</p>${d.compile_error ? `<div class="msg err">The PDF couldn't be built (${esc(d.compile_error.slice(0, 120))}). The LaTeX source still works in Overleaf.</div>` : ""}
+        ${kept.length ? `<h3>Lines we rewrote (${kept.length})</h3>${kept.map(l => `<div class="edit"><span class="muted">Before:</span> ${esc(l.original)}<span class="ex">${esc(l.rewrite)}</span></div>`).join("")}` : ""}
+        ${dropped.length ? `<h3>Rewrites we threw away (${dropped.length})</h3><p class="hint">Your original resume doesn't back these, so your own wording stays.</p>${dropped.map(l => `<div class="edit">${esc(l.rewrite)}<br><span class="muted">${esc(l.reason)}</span></div>`).join("")}` : ""}
+        ${d.trimmed.length ? `<p class="hint">Removed to fit one page: ${d.trimmed.map(esc).join("; ")}</p>` : ""}`;
+    } catch (err) { fail(out, err.message); }
+  });
+}
 function renderMatch(out, d) {
   const gaps = d.to_100;
   out.innerHTML = `
@@ -531,7 +564,10 @@ function renderMatch(out, d) {
         <span><b>${esc(g.skill)}</b> ${g.required ? '<span class="must">must-have</span>' : '<span class="muted">nice to have</span>'}<br>${esc(g.action)}</span></li>`).join("")}</ul>`
       : '<div class="next">You already show every skill this posting asks for. Use the edits below to make that obvious.</div>'}
     ${d.edits.length ? `<h3 style="margin-top:24px">Edits for this posting</h3>${d.edits.map(e => `<div class="edit"><b>${esc(e.section)}:</b> ${esc(e.change)}<span class="ex">${esc(e.example)}</span></div>`).join("")}` : ""}
-    ${d.projects.length ? `<div class="ideas"><h3>Projects that would close the gap</h3>${ideasHTML(d.projects)}</div>` : ""}`;
+    ${d.projects.length ? `<div class="ideas"><h3>Projects that would close the gap</h3>${ideasHTML(d.projects)}</div>` : ""}
+    <div class="next"><b>Want it done for you?</b> We rewrite your resume for this posting, check every line against your original, and give you a one-page PDF.
+      <br><button type="button" class="btn" id="tailor-btn" style="margin-top:10px">Rewrite my resume for this job</button><div id="tailor-out"></div></div>`;
+  $("tailor-btn").addEventListener("click", (ev) => tailorFor(d.job_id, ev.currentTarget));
   out.querySelectorAll(".copy").forEach(b => b.addEventListener("click", async () => {
     await navigator.clipboard.writeText($(b.dataset.copy).textContent); b.textContent = "Copied";
   }));
@@ -622,6 +658,62 @@ fetch("/admin/status").then(r => r.ok ? r.json() : null).then(s => {
   const h = Math.floor((Date.now() - new Date(s.last_refresh)) / 3600000);
   $("fresh").textContent = h < 1 ? "Jobs updated less than an hour ago." : h < 24 ? `Jobs updated ${h} hour${h > 1 ? "s" : ""} ago.` : `Jobs updated ${Math.floor(h / 24)} day${h >= 48 ? "s" : ""} ago.`;
 }).catch(() => {});
+
+// --- Chat agent ---------------------------------------------------------------
+const SID_KEY = "proofpath_sid";
+function sid() {
+  let v = null; try { v = localStorage.getItem(SID_KEY); } catch (_) {}
+  if (!v) { v = "s" + crypto.getRandomValues(new Uint32Array(4)).join("").slice(0, 30); try { localStorage.setItem(SID_KEY, v); } catch (_) {} }
+  return v;
+}
+const TOOL_WORDS = {search_jobs: "searched jobs", get_job: "read a posting", compare_jobs: "compared jobs", shortlist: "updated your shortlist", save_preference: "saved a preference", explain_match: "checked the fit"};
+function botHTML(d) {
+  const cards = Object.fromEntries(d.jobs.map(j => [j.id, j]));
+  let body = esc(d.reply).replace(/\[job:(\d+)\]/g, (_, id) => {
+    const j = cards[id]; if (!j) return "";
+    return `<a class="jobcard" href="${esc(j.url)}" target="_blank" rel="noopener"><b>${esc(j.title)}</b><small>${esc(j.company)}${j.location ? ", " + esc(j.location) : ""}${j.apply_by ? ". Apply by " + esc(j.apply_by) : ""} · id ${j.id}</small></a>`;
+  }).replace(/\n/g, "<br>");
+  const used = [...new Set(d.tools)].map(t => TOOL_WORDS[t] || t).join(", ");
+  return body + (used ? `<span class="used">${esc(used)}</span>` : "");
+}
+async function showMemory() {
+  try {
+    const r = await fetch(`/chat/${sid()}/memory`); if (!r.ok) return;
+    const m = await r.json(), p = m.profile, bits = [];
+    if (p.skills?.length) bits.push("skills: " + p.skills.join(", "));
+    if (p.locations?.length) bits.push("places: " + p.locations.join(", "));
+    if (p.remote) bits.push("remote");
+    if (p.levels?.length) bits.push("level: " + p.levels.join(", "));
+    if (m.shortlist.length) bits.push(`${m.shortlist.length} saved job${m.shortlist.length > 1 ? "s" : ""}`);
+    $("chat-mem").textContent = bits.length ? "Remembered: " + bits.join(" · ") : "";
+  } catch (_) {}
+}
+$("chat-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const msg = $("chat-in").value.trim(); if (!msg) return;
+  const log = $("chat-log");
+  log.insertAdjacentHTML("beforeend", `<div class="msg-me">${esc(msg)}</div>`);
+  $("chat-in").value = "";
+  const pending = document.createElement("div"); pending.className = "msg-bot"; pending.innerHTML = '<span class="spinner"></span> Thinking…';
+  log.appendChild(pending); log.scrollTop = log.scrollHeight;
+  busy(e.submitter, async () => {
+    try {
+      const r = await fetch("/chat", {method: "POST", headers: {"content-type": "application/json", ...aiHeaders()}, body: JSON.stringify({session_id: sid(), message: msg})});
+      let d = null; try { d = await r.json(); } catch (_) {}
+      if (r.status === 503) throw new Error(NEED_KEY);
+      if (!r.ok) throw new Error(typeof d?.detail === "string" ? d.detail : "That didn't work. Try again in a moment.");
+      pending.innerHTML = botHTML(d);
+      showMemory();
+    } catch (err) { pending.textContent = err.message; }
+    log.scrollTop = log.scrollHeight;
+  });
+});
+$("chat-forget").addEventListener("click", async () => {
+  await fetch(`/chat/${sid()}`, {method: "DELETE"});
+  try { localStorage.removeItem(SID_KEY); } catch (_) {}
+  $("chat-log").innerHTML = ""; $("chat-mem").textContent = "Forgotten. Nothing about you is stored now.";
+});
+showMemory();
 </script>
 </body>
 </html>

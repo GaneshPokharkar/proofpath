@@ -1,0 +1,100 @@
+{"id": "c001", "tag": "search", "message": "UI/UX design intern roles", "expect_tool": "search_jobs", "expect_args": {"field": "design", "level": "intern"}, "setup": {}}
+{"id": "c002", "tag": "search", "message": "any data analyst senior roles in Pune?", "expect_tool": "search_jobs", "expect_args": {"field": "data_ai", "level": "senior", "location": "pune"}, "setup": {}}
+{"id": "c003", "tag": "search", "message": "machine learning senior roles in Berlin", "expect_tool": "search_jobs", "expect_args": {"field": "data_ai", "level": "senior", "location": "berlin"}, "setup": {}}
+{"id": "c004", "tag": "search", "message": "data analyst entry level jobs", "expect_tool": "search_jobs", "expect_args": {"field": "data_ai", "level": "entry"}, "setup": {}}
+{"id": "c005", "tag": "search", "message": "android developer internships", "expect_tool": "search_jobs", "expect_args": {"field": "mobile", "level": "intern"}, "setup": {}}
+{"id": "c006", "tag": "search", "message": "find AI intern roles in Bangalore please", "expect_tool": "search_jobs", "expect_args": {"field": "data_ai", "level": "intern", "location": "bangalore"}, "setup": {}}
+{"id": "c007", "tag": "search", "message": "python developer internships in Berlin", "expect_tool": "search_jobs", "expect_args": {"level": "intern", "location": "berlin"}, "setup": {}}
+{"id": "c008", "tag": "search", "message": "show me devops fresher jobs", "expect_tool": "search_jobs", "expect_args": {"field": "devops_cloud", "level": "entry"}, "setup": {}}
+{"id": "c009", "tag": "search", "message": "find AI senior roles remote please", "expect_tool": "search_jobs", "expect_args": {"field": "data_ai", "level": "senior", "remote": true}, "setup": {}}
+{"id": "c010", "tag": "search", "message": "any cloud engineering internships in Berlin?", "expect_tool": "search_jobs", "expect_args": {"field": "devops_cloud", "level": "intern", "location": "berlin"}, "setup": {}}
+{"id": "c011", "tag": "search", "message": "find AI senior roles in Pune please", "expect_tool": "search_jobs", "expect_args": {"field": "data_ai", "level": "senior", "location": "pune"}, "setup": {}}
+{"id": "c012", "tag": "search", "message": "I'm looking for machine learning senior roles in Berlin", "expect_tool": "search_jobs", "expect_args": {"field": "data_ai", "level": "senior", "location": "berlin"}, "setup": {}}
+{"id": "c013", "tag": "search", "message": "find backend fresher jobs in New York please", "expect_tool": "search_jobs", "expect_args": {"level": "entry", "location": "new york"}, "setup": {}}
+{"id": "c014", "tag": "search", "message": "show me react fresher jobs remote", "expect_tool": "search_jobs", "expect_args": {"level": "entry", "remote": true}, "setup": {}}
+{"id": "c015", "tag": "search", "message": "cloud engineering jobs in Berlin", "expect_tool": "search_jobs", "expect_args": {"field": "devops_cloud", "location": "berlin"}, "setup": {}}
+{"id": "c016", "tag": "search", "message": "any QA testing senior roles in New York?", "expect_tool": "search_jobs", "expect_args": {"field": "qa", "level": "senior", "location": "new york"}, "setup": {}}
+{"id": "c017", "tag": "search", "message": "react fresher jobs in Pune", "expect_tool": "search_jobs", "expect_args": {"level": "entry", "location": "pune"}, "setup": {}}
+{"id": "c018", "tag": "search", "message": "any java developer entry level jobs in London?", "expect_tool": "search_jobs", "expect_args": {"level": "entry", "location": "london"}, "setup": {}}
+{"id": "c019", "tag": "search", "message": "devops entry level jobs", "expect_tool": "search_jobs", "expect_args": {"field": "devops_cloud", "level": "entry"}, "setup": {}}
+{"id": "c020", "tag": "search", "message": "any data analyst senior roles ?", "expect_tool": "search_jobs", "expect_args": {"field": "data_ai", "level": "senior"}, "setup": {}}
+{"id": "c021", "tag": "search", "message": "find product manager senior roles in New York please", "expect_tool": "search_jobs", "expect_args": {"field": "product", "level": "senior", "location": "new york"}, "setup": {}}
+{"id": "c022", "tag": "search", "message": "any react internships in Pune?", "expect_tool": "search_jobs", "expect_args": {"level": "intern", "location": "pune"}, "setup": {}}
+{"id": "c023", "tag": "search", "message": "full stack jobs in Pune", "expect_tool": "search_jobs", "expect_args": {"location": "pune"}, "setup": {}}
+{"id": "c024", "tag": "search", "message": "any QA testing jobs in New York?", "expect_tool": "search_jobs", "expect_args": {"field": "qa", "location": "new york"}, "setup": {}}
+{"id": "c025", "tag": "search", "message": "python developer jobs", "expect_tool": "search_jobs", "expect_args": {}, "setup": {}}
+{"id": "c026", "tag": "search", "message": "find react fresher jobs in London please", "expect_tool": "search_jobs", "expect_args": {"level": "entry", "location": "london"}, "setup": {}}
+{"id": "c027", "tag": "search", "message": "show me AI entry level jobs in Bangalore", "expect_tool": "search_jobs", "expect_args": {"field": "data_ai", "level": "entry", "location": "bangalore"}, "setup": {}}
+{"id": "c028", "tag": "search", "message": "I'm looking for QA testing intern roles in Berlin", "expect_tool": "search_jobs", "expect_args": {"field": "qa", "level": "intern", "location": "berlin"}, "setup": {}}
+{"id": "c029", "tag": "search", "message": "show me python developer entry level jobs in Pune", "expect_tool": "search_jobs", "expect_args": {"level": "entry", "location": "pune"}, "setup": {}}
+{"id": "c030", "tag": "search", "message": "show me react entry level jobs remote", "expect_tool": "search_jobs", "expect_args": {"level": "entry", "remote": true}, "setup": {}}
+{"id": "c031", "tag": "search", "message": "I'm looking for backend senior roles remote", "expect_tool": "search_jobs", "expect_args": {"level": "senior", "remote": true}, "setup": {}}
+{"id": "c032", "tag": "search", "message": "show me product manager jobs", "expect_tool": "search_jobs", "expect_args": {"field": "product"}, "setup": {}}
+{"id": "c033", "tag": "search", "message": "show me devops internships in London", "expect_tool": "search_jobs", "expect_args": {"field": "devops_cloud", "level": "intern", "location": "london"}, "setup": {}}
+{"id": "c034", "tag": "search", "message": "android developer jobs in Berlin", "expect_tool": "search_jobs", "expect_args": {"field": "mobile", "location": "berlin"}, "setup": {}}
+{"id": "c035", "tag": "search", "message": "any full stack senior roles in London?", "expect_tool": "search_jobs", "expect_args": {"level": "senior", "location": "london"}, "setup": {}}
+{"id": "c036", "tag": "search", "message": "I'm looking for QA testing internships in London", "expect_tool": "search_jobs", "expect_args": {"field": "qa", "level": "intern", "location": "london"}, "setup": {}}
+{"id": "c037", "tag": "search", "message": "show me product manager senior roles", "expect_tool": "search_jobs", "expect_args": {"field": "product", "level": "senior"}, "setup": {}}
+{"id": "c038", "tag": "search", "message": "I'm looking for java developer senior roles in Bangalore", "expect_tool": "search_jobs", "expect_args": {"level": "senior", "location": "bangalore"}, "setup": {}}
+{"id": "c039", "tag": "search", "message": "I'm looking for python developer entry level jobs", "expect_tool": "search_jobs", "expect_args": {"level": "entry"}, "setup": {}}
+{"id": "c040", "tag": "search", "message": "AI entry level jobs", "expect_tool": "search_jobs", "expect_args": {"field": "data_ai", "level": "entry"}, "setup": {}}
+{"id": "c041", "tag": "search", "message": "I'm looking for cyber security internships in Berlin", "expect_tool": "search_jobs", "expect_args": {"field": "security", "level": "intern", "location": "berlin"}, "setup": {}}
+{"id": "c042", "tag": "search", "message": "find cloud engineering internships please", "expect_tool": "search_jobs", "expect_args": {"field": "devops_cloud", "level": "intern"}, "setup": {}}
+{"id": "c043", "tag": "search", "message": "find machine learning internships in Bangalore please", "expect_tool": "search_jobs", "expect_args": {"field": "data_ai", "level": "intern", "location": "bangalore"}, "setup": {}}
+{"id": "c044", "tag": "search", "message": "any devops senior roles in Pune?", "expect_tool": "search_jobs", "expect_args": {"field": "devops_cloud", "level": "senior", "location": "pune"}, "setup": {}}
+{"id": "c045", "tag": "search", "message": "find data science internships in Berlin please", "expect_tool": "search_jobs", "expect_args": {"field": "data_ai", "level": "intern", "location": "berlin"}, "setup": {}}
+{"id": "c046", "tag": "search", "message": "any python developer intern roles remote?", "expect_tool": "search_jobs", "expect_args": {"level": "intern", "remote": true}, "setup": {}}
+{"id": "c047", "tag": "search", "message": "product manager entry level jobs in Pune", "expect_tool": "search_jobs", "expect_args": {"field": "product", "level": "entry", "location": "pune"}, "setup": {}}
+{"id": "c048", "tag": "search", "message": "I'm looking for full stack entry level jobs in New York", "expect_tool": "search_jobs", "expect_args": {"level": "entry", "location": "new york"}, "setup": {}}
+{"id": "c049", "tag": "search", "message": "QA testing internships in London", "expect_tool": "search_jobs", "expect_args": {"field": "qa", "level": "intern", "location": "london"}, "setup": {}}
+{"id": "c050", "tag": "search", "message": "I'm looking for UI/UX design jobs remote", "expect_tool": "search_jobs", "expect_args": {"field": "design", "remote": true}, "setup": {}}
+{"id": "c051", "tag": "preference", "message": "I know Python, SQL and Tableau", "expect_tool": "save_preference", "expect_args": {"key": "skills"}, "setup": {}}
+{"id": "c052", "tag": "preference", "message": "My skills are React and Node.js", "expect_tool": "save_preference", "expect_args": {"key": "skills"}, "setup": {}}
+{"id": "c053", "tag": "preference", "message": "I have worked with Docker and Kubernetes", "expect_tool": "save_preference", "expect_args": {"key": "skills"}, "setup": {}}
+{"id": "c054", "tag": "preference", "message": "I only want to work in Pune", "expect_tool": "save_preference", "expect_args": {"key": "locations"}, "setup": {}}
+{"id": "c055", "tag": "preference", "message": "I prefer jobs in Hyderabad or Chennai", "expect_tool": "save_preference", "expect_args": {"key": "locations"}, "setup": {}}
+{"id": "c056", "tag": "preference", "message": "I want remote work only", "expect_tool": "save_preference", "expect_args": {"key": "remote"}, "setup": {}}
+{"id": "c057", "tag": "preference", "message": "Please remember I'm looking for internships", "expect_tool": "save_preference", "expect_args": {"key": "levels"}, "setup": {}}
+{"id": "c058", "tag": "preference", "message": "I am not interested in sales roles", "expect_tool": "save_preference", "expect_args": {"key": "rejected_roles"}, "setup": {}}
+{"id": "c059", "tag": "preference", "message": "Never show me QA testing jobs", "expect_tool": "save_preference", "expect_args": {"key": "rejected_roles"}, "setup": {}}
+{"id": "c060", "tag": "preference", "message": "I need at least 6 LPA", "expect_tool": "save_preference", "expect_args": {"key": "salary_floor"}, "setup": {}}
+{"id": "c061", "tag": "preference", "message": "My expected salary floor is 50k per month", "expect_tool": "save_preference", "expect_args": {"key": "salary_floor"}, "setup": {}}
+{"id": "c062", "tag": "preference", "message": "I'm interested in data and AI roles", "expect_tool": "save_preference", "expect_args": {"key": "fields"}, "setup": {}}
+{"id": "c063", "tag": "preference", "message": "Remember that I know Java and Spring Boot", "expect_tool": "save_preference", "expect_args": {"key": "skills"}, "setup": {}}
+{"id": "c064", "tag": "preference", "message": "I'd like to stay in Mumbai", "expect_tool": "save_preference", "expect_args": {"key": "locations"}, "setup": {}}
+{"id": "c065", "tag": "preference", "message": "I don't want any senior positions", "expect_tool": "save_preference", "expect_args": {"key": "rejected_roles"}, "setup": {}}
+{"id": "c066", "tag": "shortlist", "message": "save job {job:0} to my shortlist", "expect_tool": "shortlist", "expect_args": {"action": "add"}, "setup": {}}
+{"id": "c067", "tag": "shortlist", "message": "shortlist job {job:7}", "expect_tool": "shortlist", "expect_args": {"action": "add"}, "setup": {}}
+{"id": "c068", "tag": "shortlist", "message": "add {job:14} to my saved jobs", "expect_tool": "shortlist", "expect_args": {"action": "add"}, "setup": {}}
+{"id": "c069", "tag": "shortlist", "message": "please bookmark job {job:21}", "expect_tool": "shortlist", "expect_args": {"action": "add"}, "setup": {}}
+{"id": "c070", "tag": "shortlist", "message": "keep job {job:28} for later", "expect_tool": "shortlist", "expect_args": {"action": "add"}, "setup": {}}
+{"id": "c071", "tag": "shortlist", "message": "remove job {job:3} from my shortlist", "expect_tool": "shortlist", "expect_args": {"action": "remove"}, "setup": {"shortlist": [3]}}
+{"id": "c072", "tag": "shortlist", "message": "drop {job:10} from my saved list", "expect_tool": "shortlist", "expect_args": {"action": "remove"}, "setup": {"shortlist": [10]}}
+{"id": "c073", "tag": "shortlist", "message": "show my shortlist", "expect_tool": "shortlist", "expect_args": {"action": "list"}, "setup": {"shortlist": [1, 2]}}
+{"id": "c074", "tag": "shortlist", "message": "what jobs have I saved?", "expect_tool": "shortlist", "expect_args": {"action": "list"}, "setup": {"shortlist": [1, 2]}}
+{"id": "c075", "tag": "shortlist", "message": "list my saved jobs", "expect_tool": "shortlist", "expect_args": {"action": "list"}, "setup": {"shortlist": [1, 2]}}
+{"id": "c076", "tag": "compare", "message": "how do jobs {job:1} and {job:2} differ?", "expect_tool": "compare_jobs", "expect_args": {}, "setup": {}}
+{"id": "c077", "tag": "compare", "message": "compare job {job:4} and job {job:9}", "expect_tool": "compare_jobs", "expect_args": {}, "setup": {}}
+{"id": "c078", "tag": "compare", "message": "how do jobs {job:12} and {job:20} differ?", "expect_tool": "compare_jobs", "expect_args": {}, "setup": {}}
+{"id": "c079", "tag": "compare", "message": "compare job {job:5} and job {job:30}", "expect_tool": "compare_jobs", "expect_args": {}, "setup": {}}
+{"id": "c080", "tag": "compare", "message": "compare job {job:40} and job {job:41}", "expect_tool": "compare_jobs", "expect_args": {}, "setup": {}}
+{"id": "c081", "tag": "compare", "message": "how do jobs {job:8} and {job:15} differ?", "expect_tool": "compare_jobs", "expect_args": {}, "setup": {}}
+{"id": "c082", "tag": "compare", "message": "which is better, {job:22} or {job:60}?", "expect_tool": "compare_jobs", "expect_args": {}, "setup": {}}
+{"id": "c083", "tag": "compare", "message": "compare job {job:70} and job {job:90}", "expect_tool": "compare_jobs", "expect_args": {}, "setup": {}}
+{"id": "c084", "tag": "explain", "message": "how well do I match job {job:1}?", "expect_tool": "explain_match", "expect_args": {}, "setup": {"profile": {"skills": ["Python", "SQL", "Pandas"], "locations": ["Bangalore"]}}}
+{"id": "c085", "tag": "explain", "message": "how well do I match job {job:6}?", "expect_tool": "explain_match", "expect_args": {}, "setup": {"profile": {"skills": ["Python", "SQL", "Pandas"], "locations": ["Bangalore"]}}}
+{"id": "c086", "tag": "explain", "message": "is job {job:11} a good fit for me?", "expect_tool": "explain_match", "expect_args": {}, "setup": {"profile": {"skills": ["Python", "SQL", "Pandas"], "locations": ["Bangalore"]}}}
+{"id": "c087", "tag": "explain", "message": "how well do I match job {job:16}?", "expect_tool": "explain_match", "expect_args": {}, "setup": {"profile": {"skills": ["Python", "SQL", "Pandas"], "locations": ["Bangalore"]}}}
+{"id": "c088", "tag": "explain", "message": "why would job {job:25} suit me?", "expect_tool": "explain_match", "expect_args": {}, "setup": {"profile": {"skills": ["Python", "SQL", "Pandas"], "locations": ["Bangalore"]}}}
+{"id": "c089", "tag": "explain", "message": "how well do I match job {job:33}?", "expect_tool": "explain_match", "expect_args": {}, "setup": {"profile": {"skills": ["Python", "SQL", "Pandas"], "locations": ["Bangalore"]}}}
+{"id": "c090", "tag": "explain", "message": "is job {job:47} a good fit for me?", "expect_tool": "explain_match", "expect_args": {}, "setup": {"profile": {"skills": ["Python", "SQL", "Pandas"], "locations": ["Bangalore"]}}}
+{"id": "c091", "tag": "explain", "message": "how well do I match job {job:55}?", "expect_tool": "explain_match", "expect_args": {}, "setup": {"profile": {"skills": ["Python", "SQL", "Pandas"], "locations": ["Bangalore"]}}}
+{"id": "c092", "tag": "details", "message": "what does job {job:2} involve?", "expect_tool": "get_job", "expect_args": {}, "setup": {}}
+{"id": "c093", "tag": "details", "message": "details of job {job:13} please", "expect_tool": "get_job", "expect_args": {}, "setup": {}}
+{"id": "c094", "tag": "details", "message": "what does job {job:21} involve?", "expect_tool": "get_job", "expect_args": {}, "setup": {}}
+{"id": "c095", "tag": "details", "message": "tell me more about job {job:34}", "expect_tool": "get_job", "expect_args": {}, "setup": {}}
+{"id": "c096", "tag": "details", "message": "what does job {job:50} involve?", "expect_tool": "get_job", "expect_args": {}, "setup": {}}
+{"id": "c097", "tag": "chitchat", "message": "hi", "expect_tool": "none", "expect_args": {}, "setup": {}}
+{"id": "c098", "tag": "chitchat", "message": "what can you do?", "expect_tool": "none", "expect_args": {}, "setup": {}}
+{"id": "c099", "tag": "chitchat", "message": "thanks, that's all", "expect_tool": "none", "expect_args": {}, "setup": {}}
+{"id": "c100", "tag": "chitchat", "message": "how do I use this?", "expect_tool": "none", "expect_args": {}, "setup": {}}

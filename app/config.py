@@ -57,6 +57,8 @@ class Settings(BaseSettings):
         None, validation_alias=AliasChoices("JOBPILOT_GITHUB_TOKEN", "GITHUB_TOKEN")
     )
     # A refresh within this many hours of the last successful one is skipped unless forced.
+    latex_compile_url: str = "https://latex.ytotech.com/builds/sync"  # Vercel has no TeX
+    memory_days: int = 1  # chat memory is deleted after this many days without use
     refresh_cooldown_hours: float = 6.0
 
     # Hybrid search tuning.

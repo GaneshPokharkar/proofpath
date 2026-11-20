@@ -156,6 +156,29 @@ class GeminiLLM:
         raise AssertionError("unreachable")
 
 
+class GeminiChat(GeminiLLM):
+    """Gemini with function calling, for the chat agent. Also a StructuredLLM (extract)."""
+
+    def chat(self, system: str, contents: list[dict], tools: list[dict], final: bool = False) -> dict:
+        data = self._post(
+            {
+                "systemInstruction": {"parts": [{"text": system}]},
+                "contents": contents,
+                "tools": [{"functionDeclarations": tools}],
+                # On the last step tools are switched off, so the model must answer in words.
+                "toolConfig": {"functionCallingConfig": {"mode": "NONE" if final else "AUTO"}},
+                "generationConfig": {"temperature": 0},
+            }
+        )
+        candidates = data.get("candidates") or []
+        if not candidates or "content" not in candidates[0]:
+            raise LLMError(f"Gemini returned no content: {json.dumps(data)[:500]}")
+        content = candidates[0]["content"]
+        content.setdefault("role", "model")
+        content.setdefault("parts", [])
+        return content
+
+
 def build_llm(provider: str, api_key: str | None, model: str) -> StructuredLLM:
     if not api_key:
         raise LLMError(f"no API key configured for LLM provider {provider!r}")

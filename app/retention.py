@@ -25,9 +25,16 @@ def purge(session: Session, now: datetime | None = None) -> dict[str, int]:
 
     run("skill_reports", "DELETE FROM market_cache WHERE built_at < :report_cutoff")
     run("github_checks", "DELETE FROM students WHERE created_at < :cutoff")
+    from app.config import get_settings
+
+    p["memory_cutoff"] = (now or datetime.now(UTC)) - timedelta(days=get_settings().memory_days)
+    run("chat_memory", "DELETE FROM agent_sessions WHERE updated_at < :memory_cutoff")
     run("telegram_chats", "DELETE FROM telegram_chats WHERE created_at < :cutoff AND NOT alerts_on")
     # Keep the newest successful run: the refresh cooldown and skill-report freshness read it.
-    run("old_runs", """DELETE FROM ingestion_runs WHERE started_at < :cutoff AND id <> COALESCE(
-        (SELECT id FROM ingestion_runs WHERE status = 'success' ORDER BY finished_at DESC LIMIT 1), -1)""")
+    run(
+        "old_runs",
+        """DELETE FROM ingestion_runs WHERE started_at < :cutoff AND id <> COALESCE(
+        (SELECT id FROM ingestion_runs WHERE status = 'success' ORDER BY finished_at DESC LIMIT 1), -1)""",
+    )
     session.commit()
     return done

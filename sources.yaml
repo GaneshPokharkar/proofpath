@@ -33,3 +33,8 @@ lever:
   - {slug: palantir, name: Palantir}
   - {slug: spotify, name: Spotify}
   - {slug: mindtickle, name: MindTickle}
+
+ashby:   # jobs.ashbyhq.com/<slug>
+  - {slug: sarvam, name: Sarvam AI}
+  - {slug: linear, name: Linear}
+  - {slug: cohere, name: Cohere}

@@ -96,3 +96,37 @@ def test_database_url_accepts_hosted_formats(monkeypatch):
     assert (
         Settings(_env_file=None).database_url == "postgresql+psycopg://u:p@host.neon.tech/db?sslmode=require"
     )
+
+
+def test_parse_ashby():
+    from app.ingest.sources import parse_ashby
+
+    payload = {
+        "jobs": [
+            {
+                "id": "a1",
+                "title": " ML Engineer ",
+                "location": "Bengaluru",
+                "isRemote": False,
+                "workplaceType": "OnSite",
+                "jobUrl": "https://jobs.ashbyhq.com/x/a1",
+                "descriptionPlain": "Python and PyTorch.",
+                "department": "AI",
+                "employmentType": "FullTime",
+                "publishedAt": "2026-11-01T10:00:00.000+00:00",
+                "isListed": True,
+            },
+            {"id": "a2", "title": "Hidden", "isListed": False, "jobUrl": "u", "descriptionPlain": ""},
+            {
+                "id": "a3",
+                "title": "Remote SRE",
+                "workplaceType": "Remote",
+                "jobUrl": "https://jobs.ashbyhq.com/x/a3",
+                "descriptionHtml": "<p>Kubernetes</p>",
+            },
+        ]
+    }
+    jobs = parse_ashby(payload, "x", "X Corp")
+    assert [j.external_id for j in jobs] == ["a1", "a3"]
+    assert jobs[0].title == "ML Engineer" and jobs[0].remote is False and jobs[0].company == "X Corp"
+    assert jobs[1].remote is True and "Kubernetes" in jobs[1].description

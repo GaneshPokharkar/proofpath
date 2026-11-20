@@ -1,0 +1,75 @@
+name: Agent evals
+
+# Runs the 100-case eval set whenever the agent's prompts, tools, model settings or the evals
+# change. A drop below evals/thresholds.json fails the check, which blocks the merge.
+on:
+  push:
+    branches: [main]
+    paths: ["app/agent/**", "app/llm.py", "app/config.py", "app/search.py", "evals/**", ".github/workflows/evals.yml"]
+  pull_request:
+    paths: ["app/agent/**", "app/llm.py", "app/config.py", "app/search.py", "evals/**", ".github/workflows/evals.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: jobpilot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      JOBPILOT_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/jobpilot
+      JOBPILOT_LLM_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Check the API key secret
+        id: key
+        run: |
+          if [ -z "$JOBPILOT_LLM_API_KEY" ]; then
+            echo "::warning::Add a GEMINI_API_KEY repository secret to run the agent evals."
+            echo "missing=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Migrate
+        if: steps.key.outputs.missing != 'true'
+        run: alembic upgrade head
+      - name: Run 100 eval cases
+        if: steps.key.outputs.missing != 'true'
+        run: python -m evals.run --out evals/report.json
+      - name: Summary
+        if: always() && steps.key.outputs.missing != 'true'
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, pathlib
+          p = pathlib.Path("evals/report.json")
+          if p.exists():
+              m = json.loads(p.read_text())["metrics"]
+              print("## Agent evals\n\n| metric | value |\n|---|---|")
+              for k, v in m.items():
+                  print(f"| {k} | {v} |")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.key.outputs.missing != 'true'
+        with:
+          name: eval-report
+          path: evals/report.json

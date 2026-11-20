@@ -1,0 +1,6 @@
+{
+  "tool_choice_accuracy_min": 0.9,
+  "filter_extraction_accuracy_min": 0.8,
+  "hallucinated_job_rate_max": 0.02,
+  "errors_max": 2
+}

@@ -81,6 +81,17 @@ def get_embedder(request: Request) -> Embedder:
 EmbedderDep = Annotated[Embedder, Depends(get_embedder)]
 
 
+def _count(session: Session, event: str) -> None:
+    """Anonymous daily usage count; never lets a counting problem break the request."""
+    from app.usage import count
+
+    try:
+        with session.begin_nested():
+            count(session, event)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def get_llm(request: Request) -> StructuredLLM:
     # Bring-your-own-key: a visitor's own Gemini key, sent per request and never stored.
     user_key = (request.headers.get("x-gemini-key") or "").strip()
@@ -234,6 +245,7 @@ def search(
         rrf_k=settings.rrf_k,
     )
     took_ms = (time.perf_counter() - start) * 1000
+    _count(session, "search")
     return SearchResponse(
         query=q,
         count=len(hits),
@@ -318,7 +330,18 @@ def stats(session: SessionDep) -> dict:
             }
             for src, active, total in per_source
         ],
+        "usage_last_30_days": _usage(session),
     }
+
+
+def _usage(session: Session) -> dict:
+    from app.usage import summary
+
+    try:
+        with session.begin_nested():
+            return summary(session)
+    except Exception:  # noqa: BLE001 - before the usage table exists
+        return {}
 
 
 class SkillDemandOut(BaseModel):
@@ -403,6 +426,7 @@ def readiness_endpoint(
             raise HTTPException(502, str(exc)) from exc
     read, _ = cached_market_read(session, llm, embedder, role, sample=sample)
     result = readiness(session, github, read)
+    _count(session, "github_check")
     return ReadinessResponse(
         github=github,
         role=role,
@@ -570,6 +594,77 @@ def _connect_bot(token: str, base_url: str) -> dict:
     return {"webhook": url, "bot": client.call("getMe").get("username")}
 
 
+# --- Chat agent --------------------------------------------------------------------------
+
+
+class ChatIn(BaseModel):
+    session_id: str
+    message: str
+
+
+class ChatOut(BaseModel):
+    reply: str
+    jobs: list[dict]
+    tools: list[str]
+
+
+def get_chat_model(request: Request):
+    """GeminiChat from the visitor's own key, else the server key. 503 when there is neither."""
+    from app.llm import GeminiChat
+
+    s = get_settings()
+    key = (request.headers.get("x-gemini-key") or "").strip() or s.llm_api_key
+    if not key:
+        raise HTTPException(503, "Add your Gemini key to chat")
+    return GeminiChat(key, s.llm_model)
+
+
+@app.post("/chat", response_model=ChatOut)
+def chat_endpoint(body: ChatIn, request: Request, session: SessionDep, embedder: EmbedderDep) -> ChatOut:
+    """One turn with the job-search agent. Memory is kept under the anonymous session id."""
+    from app.agent.agent import chat
+    from app.agent.memory import SESSION_ID
+    from app.usage import count
+
+    if not SESSION_ID.match(body.session_id):
+        raise HTTPException(422, "Bad session id")
+    message = body.message.strip()
+    if not 1 <= len(message) <= 1000:
+        raise HTTPException(422, "Write a message of up to 1000 characters")
+    model = get_chat_model(request)
+    result = chat(model, model, session, embedder, body.session_id, message)
+    count(session, "chat")
+    session.commit()
+    return ChatOut(reply=result.reply, jobs=result.jobs, tools=[c["name"] for c in result.tool_calls])
+
+
+@app.get("/chat/{session_id}/memory")
+def chat_memory(session_id: str, session: SessionDep) -> dict:
+    """What the agent remembers for this browser: the profile, shortlist and summary."""
+    from app.agent.memory import SESSION_ID, load
+
+    if not SESSION_ID.match(session_id):
+        raise HTTPException(422, "Bad session id")
+    mem = load(session, session_id)
+    return {
+        "profile": {k: v for k, v in mem.profile.items() if k != "shortlist"},
+        "shortlist": mem.shortlist,
+        "summary": mem.summary,
+        "turns": mem.turns,
+    }
+
+
+@app.delete("/chat/{session_id}")
+def chat_forget(session_id: str, session: SessionDep) -> dict:
+    from app.agent.memory import SESSION_ID, forget
+
+    if not SESSION_ID.match(session_id):
+        raise HTTPException(422, "Bad session id")
+    forget(session, session_id)
+    session.commit()
+    return {"forgotten": True}
+
+
 # --- Web pages ---------------------------------------------------------------------------
 
 _WEB = Path(__file__).resolve().parent.parent / "web"
@@ -688,6 +783,7 @@ async def resume_match(
         raise HTTPException(422, "This posting doesn't name any technical skills to compare against.")
     report = check_resume(llm, text_, job_market(job.title, job.company, job_id, [tuple(r) for r in rows]))
     edits = suggest_edits(llm, text_, job.title, job.description)
+    _count(session, "resume_match")
     return JobMatchResponse(
         job_id=job.id,
         title=job.title,
@@ -701,6 +797,87 @@ async def resume_match(
         to_100=[GapOut(**g) for g in path_to_100(report)],
         edits=[EditOut(**e.model_dump()) for e in edits],
         projects=[ProjectOut(**p.model_dump()) for p in report.projects],
+    )
+
+
+class CheckedOut(BaseModel):
+    section: str
+    original: str
+    rewrite: str
+    accepted: bool
+    reason: str
+
+
+class TailorResponse(BaseModel):
+    job_id: int
+    title: str
+    company: str
+    coverage_before: float  # share of the job's skills visible in the resume, before / after
+    coverage_after: float
+    lines: list[CheckedOut]  # every rewrite and the verifier's decision
+    trimmed: list[str]  # bullets dropped to fit one page
+    pages: int | None
+    tex: str
+    pdf_base64: str | None
+    compile_error: str | None
+
+
+@app.post("/resume/tailor", response_model=TailorResponse)
+async def resume_tailor(
+    session: SessionDep,
+    embedder: EmbedderDep,
+    llm: LLMDep,
+    resume: Annotated[UploadFile, File()],
+    job_id: Annotated[int, Form(ge=1)],
+) -> TailorResponse:
+    """Rewrite a resume for one job, reject any line the original doesn't back, and return a
+    one-page PDF plus its LaTeX. The file is read in memory and never stored."""
+    from app.market.skills import extract_job_skills
+    from app.resume.check import ResumeError, extract_text
+    from app.resume.tailor import build_pdf, pdf_b64, tailor
+
+    job = session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(404, "That job is no longer listed. Search again and pick another.")
+    data = await resume.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "That file is over 2 MB. Upload a smaller PDF.")
+    try:
+        text_ = extract_text(resume.filename or "", data)
+    except ResumeError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    extract_job_skills(session, llm, embedder, [job_id])
+    skills = [
+        r[0]
+        for r in session.execute(
+            text("SELECT s.name FROM job_skills js JOIN skills s ON s.id = js.skill_id WHERE js.job_id = :j"),
+            {"j": job_id},
+        ).all()
+    ]
+    t = tailor(llm, text_, job.title, job.description, skills)
+    t = build_pdf(t, get_settings().latex_compile_url)
+    _count(session, "resume_tailor")
+    return TailorResponse(
+        job_id=job.id,
+        title=job.title,
+        company=job.company,
+        coverage_before=t.coverage_before,
+        coverage_after=t.coverage_after,
+        lines=[
+            CheckedOut(
+                section=c.section,
+                original=c.original,
+                rewrite=c.rewrite,
+                accepted=c.accepted,
+                reason=c.reason,
+            )
+            for c in t.checked
+        ],
+        trimmed=t.trimmed,
+        pages=t.pages,
+        tex=t.tex,
+        pdf_base64=pdf_b64(t),
+        compile_error=t.compile_error,
     )
 
 
@@ -725,6 +902,7 @@ async def resume_check(
         raise HTTPException(422, str(exc)) from exc
     read, _ = cached_market_read(session, llm, embedder, role, sample=30)
     report = check_resume(llm, text, read)
+    _count(session, "resume_check")
     return ResumeResponse(
         role=report.role,
         sample_size=report.sample_size,

@@ -113,3 +113,36 @@ times a day, and not use its jobs to collect signups, so Remotive jobs are exclu
 - Resumes are read in memory and never written anywhere; contact details are removed before the AI sees them.
 - Visitors' Gemini keys stay in their own browser and travel only with their own requests.
 - The daily cron runs `app/retention.py`, which deletes everything older than 24 hours: GitHub checks, saved skill reports, Telegram subscriptions, old refresh logs, and job postings no longer seen. Postings are only cleared after a successful refresh, so a failed scrape never empties the site.
+
+## Chat agent (Ask ProofPath)
+
+`POST /chat` runs one turn of an LLM agent (Gemini function calling) over six tools in
+`app/agent/tools.py`: `search_jobs`, `get_job`, `compare_jobs`, `shortlist`, `save_preference`,
+`explain_match`. Arguments are validated; a bad call returns the error to the model so it can fix
+it. Replies may cite jobs only as `[job:ID]` for ids a tool returned, and any other id is stripped
+before the student sees it (and counted as a hallucination).
+
+**Two-layer memory** (`app/agent/memory.py`), in PostgreSQL under an anonymous browser-generated id:
+the last 6 turns verbatim plus a rolling LLM summary of older turns, and a long-term profile (skills,
+locations, remote, levels, fields, salary floor, rejected roles, shortlist) written only through the
+tools and injected into every turn. Rows are deleted after `MEMORY_DAYS` (default 1) without use,
+or at once with `DELETE /chat/{id}` ("forget me").
+
+## Evals
+
+`evals/cases.jsonl` holds 100 fixed cases (search filters, preferences, shortlist, compare, explain,
+details, small talk) run against `evals/jobs.json`, a snapshot of 173 real postings.
+`python -m evals.run` reports tool-choice accuracy, filter-extraction accuracy and hallucinated-job
+rate, and exits non-zero below `evals/thresholds.json`. `.github/workflows/evals.yml` runs it on
+every change to the agent, prompts, model settings or evals (add a `GEMINI_API_KEY` repo secret).
+
+## Resume tailoring (ResumeForge)
+
+`POST /resume/tailor` parses the resume into validated JSON, rewrites bullets for one posting,
+and runs a verifier on every rewrite: a rule check (no new numbers outside `[brackets]`, no job
+skill the resume never shows) and then an LLM fact-check against the original. Rejected lines keep
+the student's wording. The result is rendered into a LaTeX template, compiled to PDF
+(`LATEX_COMPILE_URL`), and trimmed bullet by bullet until it fits one page. Contact details are
+taken out with regexes and never sent to the LLM.
+
+Sources now include Greenhouse, Lever, **Ashby**, Arbeitnow and Remotive.

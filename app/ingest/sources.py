@@ -197,3 +197,50 @@ class LeverSource:
     def fetch(self, client: httpx.Client) -> list[JobPosting]:
         payload = get_json(client, LEVER_URL.format(company=self.company), {"mode": "json"})
         return parse_lever(payload, self.display_name or self.company.title())
+
+
+# --- Ashby --------------------------------------------------------------------------
+
+ASHBY_URL = "https://api.ashbyhq.com/posting-api/job-board/{org}"
+
+
+def parse_ashby(payload: dict, org: str, company: str) -> list[JobPosting]:
+    jobs = []
+    for item in payload.get("jobs") or []:
+        if item.get("isListed") is False:
+            continue
+        workplace = (item.get("workplaceType") or "").lower()
+        jobs.append(
+            JobPosting(
+                external_id=item["id"],
+                title=item["title"].strip(),
+                company=company,
+                url=item.get("jobUrl") or item.get("applyUrl"),
+                description=(
+                    item.get("descriptionPlain") or html_to_text(item.get("descriptionHtml"))
+                ).strip(),
+                location=clean(item.get("location")),
+                remote=True
+                if item.get("isRemote") or workplace == "remote"
+                else (False if workplace else None),
+                employment_type=clean(item.get("employmentType")),
+                tags=tuple(v for v in (item.get("department"), item.get("team")) if v),
+                posted_at=parse_iso(item.get("publishedAt")),
+            )
+        )
+    return jobs
+
+
+@dataclass
+class AshbySource:
+    org: str
+    display_name: str | None = None
+    full_snapshot: bool = True
+
+    @property
+    def key(self) -> str:
+        return f"ashby:{self.org}"
+
+    def fetch(self, client: httpx.Client) -> list[JobPosting]:
+        payload = get_json(client, ASHBY_URL.format(org=self.org), {"includeCompensation": "false"})
+        return parse_ashby(payload, self.org, self.display_name or self.org.title())

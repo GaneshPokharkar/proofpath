@@ -5,7 +5,13 @@ from pathlib import Path
 import yaml
 
 from app.ingest.base import Source
-from app.ingest.sources import ArbeitnowSource, GreenhouseSource, LeverSource, RemotiveSource
+from app.ingest.sources import (
+    ArbeitnowSource,
+    AshbySource,
+    GreenhouseSource,
+    LeverSource,
+    RemotiveSource,
+)
 
 
 def load_sources(path: str | Path) -> list[Source]:
@@ -13,7 +19,7 @@ def load_sources(path: str | Path) -> list[Source]:
     if not isinstance(config, dict):
         raise ValueError(f"{path}: expected a mapping at the top level")
 
-    unknown = set(config) - {"remotive", "arbeitnow", "greenhouse", "lever"}
+    unknown = set(config) - {"remotive", "arbeitnow", "greenhouse", "lever", "ashby"}
     if unknown:
         raise ValueError(f"{path}: unknown source types {sorted(unknown)}")
 
@@ -30,6 +36,12 @@ def load_sources(path: str | Path) -> list[Source]:
             sources.append(LeverSource(company=entry))
         else:
             sources.append(LeverSource(company=entry["slug"], display_name=entry.get("name")))
+
+    for entry in config.get("ashby") or []:
+        if isinstance(entry, str):
+            sources.append(AshbySource(org=entry))
+        else:
+            sources.append(AshbySource(org=entry["slug"], display_name=entry.get("name")))
 
     keys = [s.key for s in sources]
     duplicates = {k for k in keys if keys.count(k) > 1}

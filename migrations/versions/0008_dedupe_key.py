@@ -16,7 +16,9 @@ KEY = "md5(lower(regexp_replace(company, '[^a-zA-Z0-9]', '', 'g')) || '|' || low
 
 
 def upgrade() -> None:
-    op.execute(f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS dedupe_key TEXT GENERATED ALWAYS AS ({KEY}) STORED")
+    op.execute(
+        f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS dedupe_key TEXT GENERATED ALWAYS AS ({KEY}) STORED"
+    )
     op.execute("CREATE INDEX IF NOT EXISTS jobs_dedupe_key ON jobs (dedupe_key)")
 
 

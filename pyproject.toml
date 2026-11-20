@@ -36,6 +36,10 @@ ignore = ["B008"]  # FastAPI's Depends()/Query() in defaults is the intended pat
 "app/models.py" = ["E501"]  # the dedupe SQL expression
 "app/api/main.py" = ["E501"]
 "app/resume/check.py" = ["E501"]
+"app/agent/*.py" = ["E501"]
+"app/resume/tailor.py" = ["E501"]
+"evals/*.py" = ["E501"]
+"tests/*.py" = ["E501"]
 "migrations/versions/0008_dedupe_key.py" = ["E501"]
 
 [tool.pytest.ini_options]
