@@ -460,9 +460,9 @@ $("skills-form").addEventListener("submit", (e) => {
   busy(e.submitter, async () => {
     wait(out, "Reading live postings for this role. The first time can take up to a minute.");
     try {
-      const d = await getJSON(`/market?${new URLSearchParams({role, sample: 20})}`);
+      const d = await getJSON(`/market?${new URLSearchParams({role})}`);
       if (!d.skills.length) return fail(out, "Not enough postings for that role yet. Try a more common name for it.");
-      out.innerHTML = `<p class="count" style="margin-top:20px">Counted across ${d.sample_size} live postings for “${esc(role)}”${d.cached ? ". Saved result, up to date with today's jobs" : ""}</p>
+      out.innerHTML = `<p class="count" style="margin-top:20px">Counted across ${d.sample_size} live postings for “${esc(role)}”${d.cached ? ". Saved result from this week" : ""}</p>
         <div class="skills">${d.skills.slice(0, 15).map(s => `
           <div class="skill"><span class="name">${esc(s.skill)}</span>
             <span class="track" role="img" aria-label="${pct(s.share)} percent of postings"><span class="fill" style="width:${pct(s.share)}%"></span></span>

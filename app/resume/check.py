@@ -230,7 +230,10 @@ def path_to_100(report: ResumeReport) -> list[dict]:
                 ),
             }
         )
-    return sorted(steps, key=lambda s: -s["points"])
+    steps.sort(key=lambda s: -s["points"])
+    if steps:  # absorb rounding so the steps always add up to exactly 100
+        steps[0]["points"] = round(100 - round(report.score * 100) - sum(s["points"] for s in steps[1:]), 1)
+    return steps
 
 
 def suggest_edits(llm: StructuredLLM, resume_text: str, job_title: str, job_text: str) -> list[ResumeEdit]:

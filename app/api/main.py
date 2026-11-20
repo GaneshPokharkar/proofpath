@@ -386,7 +386,7 @@ def readiness_endpoint(
     llm: OptionalLLMDep,
     github: Annotated[str, Query(min_length=1, max_length=39, pattern=r"^[A-Za-z0-9-]+$")],
     role: Annotated[str, Query(min_length=2, max_length=120)],
-    sample: Annotated[int, Query(ge=5, le=40)] = 20,
+    sample: Annotated[int, Query(ge=5, le=40)] = 30,
 ) -> ReadinessResponse:
     """How ready a GitHub profile looks for a role: each skill employers ask for, and whether
     the student's own (non-fork) repos show evidence of it."""
