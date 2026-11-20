@@ -620,7 +620,12 @@ def get_chat_model(request: Request):
 
 
 @app.post("/chat", response_model=ChatOut)
-def chat_endpoint(body: ChatIn, request: Request, session: SessionDep, embedder: EmbedderDep) -> ChatOut:
+def chat_endpoint(
+    body: ChatIn,
+    session: SessionDep,
+    embedder: EmbedderDep,
+    model: Annotated[object, Depends(get_chat_model)],
+) -> ChatOut:
     """One turn with the job-search agent. Memory is kept under the anonymous session id."""
     from app.agent.agent import chat
     from app.agent.memory import SESSION_ID
@@ -631,7 +636,6 @@ def chat_endpoint(body: ChatIn, request: Request, session: SessionDep, embedder:
     message = body.message.strip()
     if not 1 <= len(message) <= 1000:
         raise HTTPException(422, "Write a message of up to 1000 characters")
-    model = get_chat_model(request)
     result = chat(model, model, session, embedder, body.session_id, message)
     count(session, "chat")
     session.commit()
