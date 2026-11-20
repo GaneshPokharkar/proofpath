@@ -38,7 +38,7 @@ jobs:
       - name: Static security scan
         run: bandit -q -c pyproject.toml -r app -ll
       - name: No secrets committed
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
