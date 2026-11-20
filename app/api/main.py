@@ -3,7 +3,7 @@
 import hashlib
 import secrets
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated
@@ -47,6 +47,13 @@ async def _lifespan(_app):
             )
     except Exception:  # noqa: BLE001 - never block start-up; search reports its own errors
         pass
+    # Connect the Telegram bot by itself once its token is in Vercel: no admin step needed.
+    import os
+
+    token, host = get_settings().telegram_bot_token, os.environ.get("VERCEL_PROJECT_PRODUCTION_URL")
+    if token and host:
+        with suppress(Exception):  # the admin page can still connect it by hand
+            _connect_bot(token, f"https://{host}")
     yield
 
 
@@ -536,17 +543,21 @@ async def telegram_webhook(request: Request) -> dict:
 @app.post("/admin/telegram/setup")
 def telegram_setup(request: Request) -> dict:
     """Point the bot's webhook at this deployment (run once after adding TELEGRAM_BOT_TOKEN)."""
-    from app.telegram.bot import TelegramClient
 
     _require_admin(request)
     s = get_settings()
     if not s.telegram_bot_token:
         raise HTTPException(503, "Add TELEGRAM_BOT_TOKEN in the Vercel settings first")
-    url = str(request.base_url).rstrip("/").replace("http://", "https://") + "/telegram/webhook"
-    client = TelegramClient(s.telegram_bot_token)
-    client.call(
-        "setWebhook", url=url, secret_token=_webhook_secret(s.telegram_bot_token), allowed_updates=["message"]
-    )
+    return _connect_bot(s.telegram_bot_token, str(request.base_url))
+
+
+def _connect_bot(token: str, base_url: str) -> dict:
+    from app.telegram.bot import TelegramClient
+
+    url = base_url.rstrip("/").replace("http://", "https://") + "/telegram/webhook"
+    client = TelegramClient(token)
+    if client.call("getWebhookInfo").get("url") != url:
+        client.call("setWebhook", url=url, secret_token=_webhook_secret(token), allowed_updates=["message"])
     client.call(
         "setMyCommands",
         commands=[
@@ -603,6 +614,94 @@ class ResumeResponse(BaseModel):
     score: float
     skills: list[SkillMatchOut]
     projects: list[ProjectOut]
+
+
+class GapOut(BaseModel):
+    skill: str
+    status: str
+    required: bool
+    points: float
+    action: str
+
+
+class EditOut(BaseModel):
+    section: str
+    change: str
+    example: str
+
+
+class JobMatchResponse(BaseModel):
+    job_id: int
+    title: str
+    company: str
+    location: str | None
+    url: str
+    apply_by: date | None
+    level: str
+    score: float  # 0..1 against this one job description
+    skills: list[SkillMatchOut]
+    to_100: list[GapOut]  # every remaining gap and the points it is worth; all of them = 100
+    edits: list[EditOut]
+    projects: list[ProjectOut]
+
+
+@app.post("/resume/match", response_model=JobMatchResponse)
+async def resume_match(
+    session: SessionDep,
+    embedder: EmbedderDep,
+    llm: LLMDep,
+    resume: Annotated[UploadFile, File()],
+    job_id: Annotated[int, Form(ge=1)],
+) -> JobMatchResponse:
+    """Score a resume against ONE posting and list exactly what would take it to 100.
+    The file is read in memory and never stored; contact details are removed before the LLM."""
+    from app.market.skills import extract_job_skills
+    from app.resume.check import (
+        ResumeError,
+        check_resume,
+        extract_text,
+        job_market,
+        path_to_100,
+        suggest_edits,
+    )
+
+    job = session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(404, "That job is no longer listed. Search again and pick another.")
+    data = await resume.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "That file is over 2 MB. Upload a smaller PDF.")
+    try:
+        text_ = extract_text(resume.filename or "", data)
+    except ResumeError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+    extract_job_skills(session, llm, embedder, [job_id])  # once per posting, shared with everyone
+    rows = session.execute(
+        text(
+            """SELECT s.name, s.category, js.importance FROM job_skills js JOIN skills s ON s.id = js.skill_id
+               WHERE js.job_id = :j ORDER BY js.importance = 'required' DESC, s.name"""
+        ),
+        {"j": job_id},
+    ).all()
+    if not rows:
+        raise HTTPException(422, "This posting doesn't name any technical skills to compare against.")
+    report = check_resume(llm, text_, job_market(job.title, job.company, job_id, [tuple(r) for r in rows]))
+    edits = suggest_edits(llm, text_, job.title, job.description)
+    return JobMatchResponse(
+        job_id=job.id,
+        title=job.title,
+        company=job.company,
+        location=job.location,
+        url=job.url,
+        apply_by=job.apply_by,
+        level=report.level,
+        score=report.score,
+        skills=[SkillMatchOut(**vars(m)) for m in report.skills],
+        to_100=[GapOut(**g) for g in path_to_100(report)],
+        edits=[EditOut(**e.model_dump()) for e in edits],
+        projects=[ProjectOut(**p.model_dump()) for p in report.projects],
+    )
 
 
 @app.post("/resume/check", response_model=ResumeResponse)

@@ -169,3 +169,71 @@ def check_resume(llm: StructuredLLM, resume_text: str, market: MarketRead) -> Re
         projects = llm.extract(PROJECTS_PROMPT, ask, ProjectIdeas).projects
 
     return ResumeReport(market.role, market.sample_size, profile.level, score, matches, projects)
+
+
+# --- One posting: score the resume against a single job description -----------------------------
+
+
+class ResumeEdit(BaseModel):
+    section: str = Field(description="Where to change: e.g. 'Summary', 'Skills', 'Projects: <name>'")
+    change: str = Field(description="What to change, in one sentence, tied to this job description")
+    example: str = Field(
+        description="Example wording the student can adapt. Only restate what the resume already shows; "
+        "never invent experience. Any number the student must measure goes in [brackets]."
+    )
+
+
+class ResumeEdits(BaseModel):
+    edits: list[ResumeEdit] = Field(min_length=1, max_length=6)
+
+
+EDITS_PROMPT = """You help a student tailor an honest resume to ONE job description.
+Suggest concrete edits that make skills the resume already has clearly visible to this employer:
+use the job's own words for things the student really did, move proof of required skills higher,
+and turn a bare skills-list entry into a line showing where it was used.
+Never claim experience the resume does not show. Skills the student lacks are handled separately."""
+
+
+def job_market(job_title: str, company: str, job_id: int, skills: list[tuple[str, str, str]]) -> MarketRead:
+    """Treat one posting as the 'market': required skills weigh 1, preferred ones 0.5."""
+    from app.market.demand import SkillDemand
+
+    return MarketRead(
+        role=f"{job_title} at {company}",
+        sample_size=1,
+        job_ids=[job_id],
+        skills=[
+            SkillDemand(name, cat, 1, 1 if imp == "required" else 0, 1.0 if imp == "required" else 0.5)
+            for name, cat, imp in skills
+        ],
+    )
+
+
+def path_to_100(report: ResumeReport) -> list[dict]:
+    """Each remaining gap with the points it is worth, biggest first. Fixing all of them is 100."""
+    total = sum(m.demand_share for m in report.skills) or 1.0
+    steps = []
+    for m in report.skills:
+        if m.status == "used":
+            continue
+        credit = 0.5 if m.status == "listed" else 1.0
+        steps.append(
+            {
+                "skill": m.skill,
+                "status": m.status,
+                "required": bool(m.required),
+                "points": round(m.demand_share * credit / total * 100, 1),
+                "action": (
+                    f"You list {m.skill} but never show it in use. Add a project or job bullet that says where you used it."
+                    if m.status == "listed"
+                    else f"Learn {m.skill} and prove it with a project (see the ideas below), then add it to your resume."
+                ),
+            }
+        )
+    return sorted(steps, key=lambda s: -s["points"])
+
+
+def suggest_edits(llm: StructuredLLM, resume_text: str, job_title: str, job_text: str) -> list[ResumeEdit]:
+    text = redact(resume_text)[:MAX_RESUME_CHARS]
+    ask = f"Job: {job_title}\n\nJob description:\n{job_text[:6000]}\n\nResume:\n{text}"
+    return llm.extract(EDITS_PROMPT, ask, ResumeEdits).edits

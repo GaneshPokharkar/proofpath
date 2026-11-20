@@ -167,7 +167,7 @@
   .tag.missing { background: #FFF3C2; color: #7A5D00; }
   .ideas { display: grid; gap: 16px; margin-top: 22px; }
   .ideas > h3 { font: 700 21px var(--display); margin: 8px 0 0; letter-spacing: -0.01em; }
-  .idea { border: 1px solid var(--line); border-left: 4px solid var(--route); border-radius: 0 14px 14px 0; padding: 18px 20px; }
+  .idea { 1px solid var(--line); border-left: 4px solid var(--route); border-radius: 0 14px 14px 0; padding: 18px 20px; }
   .idea h4 { font: 700 19px/1.25 var(--display); margin: 0; }
   .idea .pitch { margin: 4px 0 10px; color: var(--ink-2); }
   .idea .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 14px; color: var(--ink-3); }
@@ -314,12 +314,13 @@
 
     <section class="panel" id="resume" role="tabpanel" hidden>
       <h2>Is your resume ready for this role?</h2>
-      <p class="hint">Upload your resume and pick the role you want. We compare it with what live postings for that role ask for, then suggest projects to build that would fill the most-wanted gaps.</p>
+      <p class="hint">Pick a job from your search with <b>Score my resume for this job</b> to get your score for that exact posting and the steps to reach 100. Or type a role to compare against all its live postings.</p>
+      <div class="target" id="resume-job" hidden></div>
       <form class="fields" id="resume-form">
         <label class="field drop" id="drop">Your resume (PDF or .txt, up to 2 MB)
           <input type="file" id="resume-file" accept=".pdf,.txt,application/pdf,text/plain">
         </label>
-        <label class="field">Role you want
+        <label class="field" id="resume-role-field">Role you want
           <input type="text" id="resume-role" placeholder="data analyst intern" autocomplete="off">
         </label>
         <button class="btn" type="submit">Check my resume</button>
@@ -435,6 +436,7 @@ $("jobs-form").addEventListener("submit", (e) => {
       const d = await getJSON(`/search?${p}`);
       if (!d.results.length) return fail(out, "No open jobs match that yet. Try fewer words, a broader role like “developer”, or another field or level.");
       requestAnimationFrame(() => $("jobs").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"}));
+      d.results.forEach(j => SEEN[j.id] = j);
       out.innerHTML = `<p class="count">${d.results.length} jobs for “${esc(q)}”, best matches first</p>` + d.results.map(j => {
         const [bg, fg] = tint(j.company);
         return `<article class="job">
@@ -442,9 +444,11 @@ $("jobs-form").addEventListener("submit", (e) => {
           <div><h3>${esc(j.title)}${j.remote ? '<span class="pill">Remote</span>' : ""}${j.level === "intern" ? '<span class="lvl">Internship</span>' : j.level === "entry" ? '<span class="lvl">Entry level</span>' : ""}</h3>
             <div class="where"><b>${esc(j.company)}</b>${j.location ? `, ${esc(j.location)}` : ""}</div>
             <div class="where">${ago(j.posted_at)}${j.posted_at ? ". " : ""}${deadline(j)}</div>
-            <p>${esc(j.snippet)}</p></div>
+            <p>${esc(j.snippet)}</p>
+            <button type="button" class="score-btn" data-job="${j.id}">Score my resume for this job</button></div>
           <a class="apply" href="${esc(j.url)}" target="_blank" rel="noopener">Apply<small>on ${esc(board(j.source))}</small></a>
         </article>`; }).join("");
+      out.querySelectorAll(".score-btn").forEach(b => b.addEventListener("click", () => pickJob(SEEN[b.dataset.job])));
     } catch (err) { fail(out, err.message); }
   });
 });
@@ -495,9 +499,62 @@ $("ready-form").addEventListener("submit", (e) => {
   });
 });
 
+const SEEN = {};
+let JOB = null;
+function pickJob(j) {
+  JOB = j;
+  const box = $("resume-job");
+  if (!j) { box.hidden = true; $("resume-role-field").hidden = false; return; }
+  box.innerHTML = `<h3>Scoring against: ${esc(j.title)}</h3><p>${esc(j.company)}${j.location ? `, ${esc(j.location)}` : ""}. ${deadline(j)}</p>
+    <button type="button" id="job-clear">Check against a whole role instead</button>`;
+  box.hidden = false; $("resume-role-field").hidden = true;
+  $("job-clear").addEventListener("click", () => pickJob(null));
+  showTab("resume"); $("resume-file").focus();
+}
+function ideasHTML(projects) {
+  return projects.map((p, i) => `<article class="idea">
+    <h4>${esc(p.title)}</h4><p class="pitch">${esc(p.pitch)}</p>
+    <div class="meta">Proves ${p.skills.map(s => `<span class="tag missing">${esc(s)}</span>`).join("")}<span>about ${p.weeks} week${p.weeks > 1 ? "s" : ""}, part-time</span></div>
+    <ol>${p.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>
+    <p class="done"><b>Done when:</b> ${esc(p.done_when)}</p>
+    <div class="bullet"><b>Add this once it's built. Replace anything in [brackets] with what you measure.</b><span id="mbullet-${i}">${esc(p.resume_bullet)}</span>
+      <br><button type="button" class="copy" data-copy="mbullet-${i}">Copy bullet</button></div></article>`).join("");
+}
+function renderMatch(out, d) {
+  const gaps = d.to_100;
+  out.innerHTML = `
+    <div class="ready-head"><div class="score">${pct(d.score)}<small>/100</small></div>
+      <p>Your resume against <b>${esc(d.title)}</b> at <b>${esc(d.company)}</b>. Must-have skills count double nice-to-haves; skills you only list count half.
+      <a href="${esc(d.url)}" target="_blank" rel="noopener">Read the posting</a></p></div>
+    ${gaps.length ? `<h3>How to reach 100</h3><p class="hint">Each step adds the points shown. Do all of them and you score 100.</p>
+      <ul class="gaps">${gaps.map(g => `<li><span class="pts">+${g.points}<small> pts</small></span>
+        <span><b>${esc(g.skill)}</b> ${g.required ? '<span class="must">must-have</span>' : '<span class="muted">nice to have</span>'}<br>${esc(g.action)}</span></li>`).join("")}</ul>`
+      : '<div class="next">You already show every skill this posting asks for. Use the edits below to make that obvious.</div>'}
+    ${d.edits.length ? `<h3 style="margin-top:24px">Edits for this posting</h3>${d.edits.map(e => `<div class="edit"><b>${esc(e.section)}:</b> ${esc(e.change)}<span class="ex">${esc(e.example)}</span></div>`).join("")}` : ""}
+    ${d.projects.length ? `<div class="ideas"><h3>Projects that would close the gap</h3>${ideasHTML(d.projects)}</div>` : ""}`;
+  out.querySelectorAll(".copy").forEach(b => b.addEventListener("click", async () => {
+    await navigator.clipboard.writeText($(b.dataset.copy).textContent); b.textContent = "Copied";
+  }));
+}
+
 $("resume-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const file = $("resume-file").files[0], role = $("resume-role").value.trim(), out = $("resume-out");
+  if (JOB) {
+    if (!file) return fail(out, "Choose your resume file first.");
+    if (file.size > 2 * 1024 * 1024) return fail(out, "That file is over 2 MB. Export a smaller PDF and try again.");
+    return busy(e.submitter, async () => {
+      wait(out, "Reading the posting and your resume. This takes about half a minute.");
+      try {
+        const fd = new FormData(); fd.append("resume", file); fd.append("job_id", JOB.id);
+        const r = await fetch("/resume/match", {method: "POST", body: fd, headers: aiHeaders()});
+        let d = null; try { d = await r.json(); } catch (_) {}
+        if (r.status === 503) throw new Error(NEED_KEY);
+        if (!r.ok) throw new Error(typeof d?.detail === "string" ? d.detail : "That didn't work. Check the file and try again.");
+        renderMatch(out, d);
+      } catch (err) { fail(out, err.message); }
+    });
+  }
   if (!file || !role) return fail(out, "Choose your resume file and type the role you want.");
   if (file.size > 2 * 1024 * 1024) return fail(out, "That file is over 2 MB. Export a smaller PDF and try again.");
   busy(e.submitter, async () => {

@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from app.api.main import app
 from app.db import get_session
@@ -13,6 +14,8 @@ from app.market.skills import ExtractedSkills
 from app.resume.check import (
     ProjectIdea,
     ProjectIdeas,
+    ResumeEdit,
+    ResumeEdits,
     ResumeError,
     ResumeProfile,
     ResumeSkill,
@@ -65,6 +68,14 @@ class ResumeLLM:
                         done_when="Deployed with a public link",
                         weeks=2,
                         resume_bullet="Built a job alert bot used by [N] students.",
+                    )
+                ]
+            )
+        if schema is ResumeEdits:
+            return ResumeEdits(
+                edits=[
+                    ResumeEdit(
+                        section="Skills", change="Show where you used SQL", example="Built [X] with SQL"
                     )
                 ]
             )
@@ -175,3 +186,23 @@ def test_gemini_schema_keeps_fields_named_title():
     item = schema["properties"]["projects"]["items"]
     assert "title" in item["properties"] and set(item["required"]) <= set(item["properties"])
     assert "title" not in item  # the annotation is gone
+
+
+def test_match_resume_to_one_job(client, session):
+    job_id = session.execute(text("SELECT id FROM jobs WHERE external_id = '1'")).scalar()
+    r = client.post(
+        "/resume/match", data={"job_id": job_id}, files={"resume": ("cv.txt", RESUME.encode(), "text/plain")}
+    )
+    assert r.status_code == 200, r.text
+    b = r.json()
+    assert b["title"] == "Backend Engineer" and 0 < b["score"] < 1
+    # Fixing every listed gap takes the score to exactly 100.
+    assert round(b["score"] * 100 + sum(g["points"] for g in b["to_100"])) == 100
+    assert b["edits"][0]["section"] == "Skills"
+
+
+def test_match_unknown_job(client):
+    r = client.post(
+        "/resume/match", data={"job_id": 999999}, files={"resume": ("cv.txt", RESUME.encode(), "text/plain")}
+    )
+    assert r.status_code == 404
