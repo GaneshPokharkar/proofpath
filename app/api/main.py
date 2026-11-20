@@ -39,6 +39,12 @@ EmbedderDep = Annotated[Embedder, Depends(get_embedder)]
 
 
 def get_llm(request: Request) -> StructuredLLM:
+    # Bring-your-own-key: a visitor's own Gemini key, sent per request and never stored.
+    user_key = (request.headers.get("x-gemini-key") or "").strip()
+    if user_key:
+        if len(user_key) > 200:
+            raise HTTPException(400, "That API key doesn't look right")
+        return build_llm("gemini", user_key, get_settings().llm_model)
     if getattr(request.app.state, "llm", None) is None:
         settings = get_settings()
         if not settings.llm_api_key:

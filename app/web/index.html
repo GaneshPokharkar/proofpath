@@ -47,6 +47,14 @@
   .bar nav a { color: var(--ink-2); text-decoration: none; }
   .bar nav a:hover { color: var(--ink); }
 
+  .keybox { margin: 0 0 22px; padding: 16px 18px; border: 1.5px solid #D5DCEA; border-radius: 12px; background: #fff; }
+  .keybox h2 { font: 700 18px/1.2 var(--display); margin: 0 0 4px; }
+  .keybox p { margin: 0 0 10px; color: var(--ink-2); font-size: 15px; }
+  .keybox form { display: flex; gap: 8px; flex-wrap: wrap; }
+  .keybox input { flex: 1 1 260px; padding: 10px 12px; border: 1.5px solid #C8D1E3; border-radius: 8px; font: inherit; }
+  .keybox button { padding: 10px 16px; border-radius: 8px; border: 0; background: var(--route); color: #fff; font: 600 15px var(--body); cursor: pointer; }
+  .keybox button.ghost { background: transparent; color: var(--route); border: 1.5px solid var(--route); }
+  .keybox .ok { color: var(--proof); font-weight: 600; }
   /* Hero: the search box is the hero */
   .hero { padding: 48px 0 28px; }
   .hero h1 { font: 800 clamp(38px, 6.2vw, 68px)/1.02 var(--display); letter-spacing: -0.035em; margin: 0; max-width: 15ch; }
@@ -258,6 +266,12 @@
   </section>
 
   <div id="tools">
+    <section class="keybox" aria-labelledby="key-h">
+      <h2 id="key-h">Your Gemini key</h2>
+      <p>The skills, resume and GitHub tools use Google Gemini. Paste your own free key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. It stays in this browser and is sent only with your own requests; we never save it.</p>
+      <form id="key-form"><input id="key-input" type="password" autocomplete="off" placeholder="Paste your key (starts with AIza)" aria-label="Gemini API key"><button type="submit">Save key</button><button type="button" class="ghost" id="key-clear">Remove</button></form>
+      <p id="key-state" role="status" style="margin:8px 0 0"></p>
+    </section>
     <div class="route" role="tablist" aria-label="Your path">
       <button class="stop" role="tab" aria-selected="true" aria-controls="jobs" data-tab="jobs">
         <span class="dot">1</span><strong>Find jobs</strong><span class="sub">Live postings from company job boards, refreshed daily</span>
@@ -365,11 +379,20 @@ document.querySelectorAll(".chips").forEach(box => box.addEventListener("click",
 const wait = (out, text) => out.innerHTML = `<div class="msg wait" role="status"><span class="spinner"></span>${esc(text)}</div>`;
 const fail = (out, text) => out.innerHTML = `<div class="msg err" role="alert">${esc(text)}</div>`;
 
+const KEY = "proofpath_gemini_key";
+const getKey = () => { try { return localStorage.getItem(KEY) || ""; } catch (_) { return ""; } };
+const aiHeaders = () => getKey() ? {"X-Gemini-Key": getKey()} : {};
+const NEED_KEY = "Add your free Gemini key in the box above, then try again.";
+function showKey() { $("key-state").innerHTML = getKey() ? '<span class="ok">Key saved in this browser.</span>' : "No key saved yet."; }
+$("key-form").addEventListener("submit", (e) => { e.preventDefault(); const v = $("key-input").value.trim(); if (!v) return; try { localStorage.setItem(KEY, v); } catch (_) {} $("key-input").value = ""; showKey(); });
+$("key-clear").addEventListener("click", () => { try { localStorage.removeItem(KEY); } catch (_) {} showKey(); });
+showKey();
+
 async function getJSON(url) {
-  const r = await fetch(url);
+  const r = await fetch(url, {headers: aiHeaders()});
   let body = null;
   try { body = await r.json(); } catch (_) {}
-  if (r.status === 503) throw new Error("This tool isn't switched on yet. Job search already works; skills and GitHub checks open soon.");
+  if (r.status === 503) throw new Error(NEED_KEY);
   if (r.status === 502) throw new Error("GitHub didn't answer. Check the username, or try again in a minute.");
   if (!r.ok) throw new Error(typeof body?.detail === "string" ? body.detail : "Something in the form doesn't look right. Check it and try again.");
   return body;
@@ -481,9 +504,9 @@ $("resume-form").addEventListener("submit", (e) => {
     wait(out, "Reading your resume and live postings for this role. This can take up to a minute.");
     try {
       const fd = new FormData(); fd.append("resume", file); fd.append("role", role);
-      const r = await fetch("/resume/check", {method: "POST", body: fd});
+      const r = await fetch("/resume/check", {method: "POST", body: fd, headers: aiHeaders()});
       let d = null; try { d = await r.json(); } catch (_) {}
-      if (r.status === 503) throw new Error("This tool isn't switched on yet. Job search already works; the resume check opens soon.");
+      if (r.status === 503) throw new Error(NEED_KEY);
       if (!r.ok) throw new Error(typeof d?.detail === "string" ? d.detail : "That didn't work. Check the file and try again.");
       const by = (st) => d.skills.filter(s => s.status === st);
       const tags = (list, cls) => list.length ? `<div class="tags">${list.map(s => `<span class="tag ${cls}">${esc(s.skill)}</span>`).join("")}</div>` : '<p>None</p>';
