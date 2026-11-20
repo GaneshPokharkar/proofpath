@@ -206,3 +206,36 @@ def test_match_unknown_job(client):
         "/resume/match", data={"job_id": 999999}, files={"resume": ("cv.txt", RESUME.encode(), "text/plain")}
     )
     assert r.status_code == 404
+
+
+def test_one_resume_scored_against_many_jobs(client, session):
+    from app.resume.check import ResumeProfile, ResumeSkill, profile_statuses, score_job
+
+    prof = ResumeProfile(
+        level="student",
+        skills=[ResumeSkill(name="Python", where="project"), ResumeSkill(name="SQL", where="skills_list")],
+    )
+    s = score_job(
+        profile_statuses(prof), [("Python", "required"), ("SQL", "required"), ("Docker", "preferred")]
+    )
+    # Python 1 + SQL 0.5 (listed) of 2.5 total = 0.6; the gaps add up to exactly 100
+    assert s["score"] == 0.6
+    assert round(s["score"] * 100 + sum(g["points"] for g in s["to_100"])) == 100
+    assert [g["skill"] for g in s["to_100"]] == ["Docker", "SQL"] or [g["skill"] for g in s["to_100"]] == [
+        "SQL",
+        "Docker",
+    ]
+
+    r = client.post("/resume/profile", files={"resume": ("cv.txt", RESUME.encode(), "text/plain")})
+    assert r.status_code == 200, r.text
+    profile = r.json()
+    ids = [i for (i,) in session.execute(text("SELECT id FROM jobs ORDER BY id")).all()]
+    r = client.post("/match/scores", json={"profile": profile, "job_ids": ids})
+    assert r.status_code == 200, r.text
+    scores = r.json()["scores"]
+    assert set(map(int, scores)) == set(ids)
+    assert all(0 <= v["score"] <= 1 for v in scores.values())
+    bad = client.post(
+        "/match/scores", json={"profile": {"skills": [{"name": "x", "where": "nowhere"}]}, "job_ids": ids}
+    )
+    assert bad.status_code == 422

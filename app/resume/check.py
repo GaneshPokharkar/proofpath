@@ -226,7 +226,7 @@ def path_to_100(report: ResumeReport) -> list[dict]:
                 "action": (
                     f"You list {m.skill} but never show it in use. Add a project or job bullet that says where you used it."
                     if m.status == "listed"
-                    else f"Learn {m.skill} and prove it with a project (see the ideas below), then add it to your resume."
+                    else f"Learn {m.skill} and prove it with a small project, then add it to your resume."
                 ),
             }
         )
@@ -240,3 +240,43 @@ def suggest_edits(llm: StructuredLLM, resume_text: str, job_title: str, job_text
     text = redact(resume_text)[:MAX_RESUME_CHARS]
     ask = f"Job: {job_title}\n\nJob description:\n{job_text[:6000]}\n\nResume:\n{text}"
     return llm.extract(EDITS_PROMPT, ask, ResumeEdits).edits
+
+
+# --- One resume against many jobs: read the resume once, score each posting without the LLM -------
+
+
+def profile_statuses(profile: ResumeProfile) -> dict[str, str]:
+    """Normalised skill -> 'used' (applied in a project or job) or 'listed' (only named)."""
+    best: dict[str, str] = {}
+    rank = {"experience": 2, "project": 2, "education": 1, "skills_list": 1}
+    for s in profile.skills:
+        key = _norm(s.name)
+        status = "used" if rank[s.where] == 2 else "listed"
+        if best.get(key) != "used":
+            best[key] = status
+    return best
+
+
+def read_profile(llm: StructuredLLM, resume_text: str) -> ResumeProfile:
+    return llm.extract(PROFILE_PROMPT, f"Resume:\n{redact(resume_text)[:MAX_RESUME_CHARS]}", ResumeProfile)
+
+
+def score_job(statuses: dict[str, str], job_skills: list[tuple[str, str]]) -> dict:
+    """Score against one posting's (skill, importance) list. Must-haves weigh 1, nice-to-haves 0.5;
+    a skill only listed earns half. Returns the score and every gap with the points it is worth,
+    adding up to exactly 100."""
+    skills = [
+        SkillMatch(
+            name,
+            1.0 if imp == "required" else 0.5,
+            1 if imp == "required" else 0,
+            statuses.get(_norm(name), "missing"),
+        )
+        for name, imp in job_skills
+    ]
+    total = sum(m.demand_share for m in skills)
+    if not total:
+        return {"score": None, "skills": [], "to_100": []}
+    got = sum(m.demand_share * (1.0 if m.status == "used" else 0.5) for m in skills if m.status != "missing")
+    report = ResumeReport("", 1, "", round(got / total, 3), skills, [])
+    return {"score": report.score, "skills": [vars(m) for m in skills], "to_100": path_to_100(report)}

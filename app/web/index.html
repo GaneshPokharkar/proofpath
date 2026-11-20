@@ -290,6 +290,10 @@
 
     <section class="panel" id="jobs" role="tabpanel">
       <h2>Jobs</h2>
+      <div class="fitbar">
+        <label class="fitfile"><input type="file" id="fit-file" accept=".pdf,.txt,application/pdf,text/plain"> <b>Add your resume</b> to see how well you fit each job and what to change for 100%.</label>
+        <span id="fit-state" role="status"></span>
+      </div>
       <div id="jobs-out"><p class="hint">Search above to see live jobs. Every result links to the company's own posting.</p></div>
     </section>
 
@@ -452,16 +456,19 @@ $("jobs-form").addEventListener("submit", (e) => {
       d.results.forEach(j => SEEN[j.id] = j);
       out.innerHTML = `<p class="count">${d.results.length} jobs for “${esc(q)}”, best matches first</p>` + d.results.map(j => {
         const [bg, fg] = tint(j.company);
-        return `<article class="job">
+        return `<article class="job" data-id="${j.id}">
           <div class="avatar" style="background:${bg};color:${fg}" aria-hidden="true">${esc(j.company.trim()[0] || "?")}</div>
           <div><h3>${esc(j.title)}${j.remote ? '<span class="pill">Remote</span>' : ""}${j.level === "intern" ? '<span class="lvl">Internship</span>' : j.level === "entry" ? '<span class="lvl">Entry level</span>' : ""}</h3>
             <div class="where"><b>${esc(j.company)}</b>${j.location ? `, ${esc(j.location)}` : ""}</div>
             <div class="where">${ago(j.posted_at)}${j.posted_at ? ". " : ""}${deadline(j)}</div>
             <p>${esc(j.snippet)}</p>
-            <button type="button" class="score-btn" data-job="${j.id}">Score my resume for this job</button></div>
+            <div class="fit" id="fit-${j.id}"></div>
+            <button type="button" class="score-btn" data-job="${j.id}">Full resume check for this job</button></div>
           <a class="apply" href="${esc(j.url)}" target="_blank" rel="noopener">Apply<small>on ${esc(board(j.source))}</small></a>
         </article>`; }).join("");
       out.querySelectorAll(".score-btn").forEach(b => b.addEventListener("click", () => pickJob(SEEN[b.dataset.job])));
+      LAST_IDS = d.results.map(j => j.id);
+      if (PROFILE) scoreJobs();
     } catch (err) { fail(out, err.message); }
   });
 });
@@ -716,6 +723,55 @@ $("chat-forget").addEventListener("click", async () => {
   $("chat-log").innerHTML = ""; $("chat-mem").textContent = "Forgotten. Nothing about you is stored now.";
 });
 showMemory();
+
+// --- Resume fit for every search result ---------------------------------------------
+let PROFILE = null, LAST_IDS = [];
+function fitHTML(f) {
+  if (!f) return "";
+  if (f.pending) return '<span class="muted">Add your Gemini key to score this job.</span>';
+  if (f.score === null) return '<span class="muted">This posting names no technical skills to compare.</span>';
+  const p = Math.round(f.score * 100), cls = p >= 75 ? "hi" : p >= 45 ? "mid" : "lo";
+  const gaps = f.to_100.map(g => `<li><b class="pts">+${g.points}</b> <b>${esc(g.skill)}</b> ${g.required ? '<span class="must">must-have</span>' : '<span class="muted">nice to have</span>'}<br>${esc(g.action)}</li>`).join("");
+  return `<span class="badge ${cls}">${p}% match</span>
+    ${gaps ? `<details><summary>How to reach 100%</summary><ul>${gaps}</ul></details>` : ' <span class="muted">You show every skill this job asks for.</span>'}`;
+}
+async function scoreJobs() {
+  if (!PROFILE || !LAST_IDS.length) return;
+  LAST_IDS.forEach(id => { const el = $("fit-" + id); if (el) el.innerHTML = '<span class="spinner"></span><span class="muted">Scoring…</span>'; });
+  try {
+    const r = await fetch("/match/scores", {method: "POST", headers: {"content-type": "application/json", ...aiHeaders()}, body: JSON.stringify({profile: PROFILE, job_ids: LAST_IDS})});
+    const d = await r.json();
+    if (!r.ok) throw new Error(typeof d?.detail === "string" ? d.detail : "Scoring failed");
+    Object.entries(d.scores).forEach(([id, f]) => { const el = $("fit-" + id); if (el) el.innerHTML = fitHTML(f); });
+    const box = $("jobs-out");
+    if (!$("sort-fit") && box.querySelector(".count")) {
+      box.querySelector(".count").insertAdjacentHTML("beforeend", ' <button type="button" class="linkbtn" id="sort-fit">Best fit first</button>');
+      $("sort-fit").addEventListener("click", () => {
+        const arts = [...box.querySelectorAll("article.job")];
+        const sc = id => d.scores[id]?.score ?? -1;
+        arts.sort((a, b) => sc(b.dataset.id) - sc(a.dataset.id)).forEach(a => box.appendChild(a));
+      });
+    }
+  } catch (err) {
+    LAST_IDS.forEach(id => { const el = $("fit-" + id); if (el) el.innerHTML = `<span class="muted">${esc(err.message)}</span>`; });
+  }
+}
+$("fit-file").addEventListener("change", async () => {
+  const file = $("fit-file").files[0]; if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { $("fit-state").textContent = "That file is over 2 MB."; return; }
+  $("fit-state").innerHTML = '<span class="spinner"></span>Reading your resume…';
+  try {
+    const fd = new FormData(); fd.append("resume", file);
+    const r = await fetch("/resume/profile", {method: "POST", body: fd, headers: aiHeaders()});
+    let d = null; try { d = await r.json(); } catch (_) {}
+    if (r.status === 503) throw new Error(NEED_KEY);
+    if (!r.ok) throw new Error(typeof d?.detail === "string" ? d.detail : "Couldn't read that file.");
+    PROFILE = d;
+    try { const dt = new DataTransfer(); dt.items.add(file); $("resume-file").files = dt.files; } catch (_) {}
+    $("fit-state").textContent = `Read ${d.skills.length} skills. Your file isn't saved. ${LAST_IDS.length ? "" : "Now search for jobs."}`;
+    scoreJobs();
+  } catch (err) { $("fit-state").textContent = err.message; }
+});
 </script>
 </body>
 </html>

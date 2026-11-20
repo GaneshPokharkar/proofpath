@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_session
 from app.embeddings import Embedder, FastEmbedEmbedder
-from app.llm import StructuredLLM, build_llm
+from app.llm import LLMError, StructuredLLM, build_llm
 from app.market.demand import NeedsKey, cached_market_read
 from app.models import IngestionRun, Job
 from app.search import SearchFilters, hybrid_search
@@ -43,6 +43,22 @@ async def _lifespan(_app):
 
 
 app = FastAPI(title="ProofPath", version="0.2.0", lifespan=_lifespan)
+
+
+@app.exception_handler(LLMError)
+async def _llm_error(_request: Request, exc: LLMError):
+    from fastapi.responses import JSONResponse
+
+    if "429" in str(exc) or "quota" in str(exc).lower():
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": "The free AI limit for today is used up. Add your own free Gemini key above, or try again tomorrow."
+            },
+        )
+    return JSONResponse(
+        status_code=502, content={"detail": "The AI service didn't answer. Try again in a minute."}
+    )
 
 
 @app.exception_handler(NeedsKey)
@@ -870,6 +886,82 @@ async def resume_tailor(
         pdf_base64=pdf_b64(t),
         compile_error=t.compile_error,
     )
+
+
+class ProfileSkillIn(BaseModel):
+    name: str
+    where: str
+
+
+class ProfileIn(BaseModel):
+    skills: list[ProfileSkillIn]
+    level: str = "student"
+
+
+@app.post("/resume/profile")
+async def resume_profile(llm: LLMDep, resume: Annotated[UploadFile, File()]) -> dict:
+    """Read a resume once into its skills (and where each is shown). Nothing is stored: the browser
+    keeps this and sends it with /match/scores, so scoring many jobs needs no more AI calls."""
+    from app.resume.check import ResumeError, extract_text, read_profile
+
+    data = await resume.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "That file is over 2 MB. Upload a smaller PDF.")
+    try:
+        text_ = extract_text(resume.filename or "", data)
+    except ResumeError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return read_profile(llm, text_).model_dump()
+
+
+class ScoresIn(BaseModel):
+    profile: ProfileIn
+    job_ids: list[int]
+
+
+@app.post("/match/scores")
+def match_scores(body: ScoresIn, session: SessionDep, embedder: EmbedderDep, llm: OptionalLLMDep) -> dict:
+    """Match score for each job (up to 20) plus the changes that would take it to 100.
+    A posting's skills are read by the AI once and reused for everyone; postings not read yet are
+    read with the visitor's key, or reported as pending when there is none."""
+    from app.market.skills import extract_job_skills
+    from app.resume.check import ResumeProfile, profile_statuses, score_job
+
+    ids = list(dict.fromkeys(body.job_ids))[:20]
+    if not ids:
+        return {"scores": {}}
+    if llm is not None:
+        extract_job_skills(session, llm, embedder, ids)
+    rows = session.execute(
+        text(
+            """SELECT js.job_id, s.name, js.importance FROM job_skills js JOIN skills s ON s.id = js.skill_id
+               WHERE js.job_id = ANY(:ids) ORDER BY js.importance = 'required' DESC, s.name"""
+        ),
+        {"ids": ids},
+    ).all()
+    done = set(
+        session.scalars(
+            text("SELECT job_id FROM job_skill_extractions WHERE job_id = ANY(:ids)"), {"ids": ids}
+        )
+    )
+    per_job: dict[int, list[tuple[str, str]]] = {}
+    for job_id, name, importance in rows:
+        per_job.setdefault(job_id, []).append((name, importance))
+    from pydantic import ValidationError
+
+    try:
+        profile = ResumeProfile.model_validate(body.profile.model_dump())
+    except ValidationError as exc:
+        raise HTTPException(422, "Upload your resume again") from exc
+    statuses = profile_statuses(profile)
+    out = {}
+    for jid in ids:
+        if jid not in done:
+            out[jid] = {"pending": True}
+        else:
+            out[jid] = score_job(statuses, per_job.get(jid, []))
+    _count(session, "match_scores")
+    return {"scores": out}
 
 
 @app.post("/resume/check", response_model=ResumeResponse)
