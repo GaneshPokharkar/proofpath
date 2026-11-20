@@ -2,6 +2,7 @@
 
 import hashlib
 import math
+import os
 import re
 from typing import Protocol
 
@@ -23,7 +24,8 @@ class FastEmbedEmbedder:
         from fastembed import TextEmbedding  # imported lazily: loading the model takes seconds
 
         self.model_name = model_name
-        self._model = TextEmbedding(model_name)
+        # On read-only hosts (Vercel) only /tmp is writable: FASTEMBED_CACHE_PATH points there.
+        self._model = TextEmbedding(model_name, cache_dir=os.environ.get("FASTEMBED_CACHE_PATH"))
         self._batch_size = batch_size
         probe = next(iter(self._model.embed(["dimension check"])))
         if len(probe) != EMBEDDING_DIM:

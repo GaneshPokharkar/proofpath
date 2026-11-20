@@ -19,7 +19,7 @@ def client(session, embedder):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
-    del app.state.embedder
+    app.state.embedder = None
 
 
 def test_health(client):

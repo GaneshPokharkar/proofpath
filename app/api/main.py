@@ -1,7 +1,6 @@
 """HTTP API. Phase 1 exposes search; the chat agent arrives in phase 2."""
 
 import time
-from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Annotated
 
@@ -19,21 +18,16 @@ from app.market.demand import market_read
 from app.models import IngestionRun, Job
 from app.search import SearchFilters, hybrid_search
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Tests inject their own embedder before startup; production loads the real model once.
-    if not hasattr(app.state, "embedder"):
-        app.state.embedder = FastEmbedEmbedder(get_settings().embedding_model)
-    yield
-
-
-app = FastAPI(title="JobPilot", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="ProofPath", version="0.2.0")
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
 
 def get_embedder(request: Request) -> Embedder:
+    # Loaded on first use, not at startup: on serverless hosts a cold start that only serves
+    # /health should not pay for loading (or downloading) the embedding model. Tests set it first.
+    if getattr(request.app.state, "embedder", None) is None:
+        request.app.state.embedder = FastEmbedEmbedder(get_settings().embedding_model)
     return request.app.state.embedder
 
 
