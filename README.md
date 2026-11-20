@@ -107,3 +107,9 @@ times a day, and not use its jobs to collect signups, so Remotive jobs are exclu
    tailoring to a one-page LaTeX PDF with a no-invented-claims verifier
 4. Evals: 100-case golden set (tool choice, filter extraction, hallucinated-job rate), gated in CI
 5. DevOps: Terraform on AWS (EC2, RDS Postgres with pgvector, ECR, SSM), CI/CD deploys, Prometheus and Grafana
+
+## Privacy: nothing is kept longer than a day
+
+- Resumes are read in memory and never written anywhere; contact details are removed before the AI sees them.
+- Visitors' Gemini keys stay in their own browser and travel only with their own requests.
+- The daily cron runs `app/retention.py`, which deletes everything older than 24 hours: GitHub checks, saved skill reports, Telegram subscriptions, old refresh logs, and job postings no longer seen. Postings are only cleared after a successful refresh, so a failed scrape never empties the site.

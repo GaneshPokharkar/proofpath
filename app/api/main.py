@@ -398,6 +398,11 @@ def cron_daily(request: Request) -> dict:
 
     result = vars(_refresh(request, force=False))
     result["alerts_sent"] = _send_alerts(request)
+    from app.db import session_scope
+    from app.retention import purge
+
+    with session_scope() as session:
+        result["purged"] = purge(session)
     return result
 
 
