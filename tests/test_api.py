@@ -51,3 +51,23 @@ def test_stats(client):
     body = client.get("/stats").json()
     assert body["active_jobs"] == 4
     assert body["sources"][0]["source"] == "greenhouse:acme"
+
+
+def test_market_needs_llm_key(client, monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", None)
+    r = client.get("/market", params={"role": "backend engineer"})
+    assert r.status_code == 503 and "ANTHROPIC_API_KEY" in r.json()["detail"]
+
+
+def test_market_endpoint_with_fake_llm(client):
+    from tests.test_market import FakeLLM
+
+    app.state.llm = FakeLLM()
+    try:
+        body = client.get("/market", params={"role": "devops kubernetes", "sample": 5}).json()
+    finally:
+        del app.state.llm
+    assert body["sample_size"] >= 1
+    assert any(s["skill"] == "Kubernetes" for s in body["skills"])

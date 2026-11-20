@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_session
 from app.embeddings import Embedder, FastEmbedEmbedder
+from app.llm import AnthropicLLM, StructuredLLM
+from app.market.demand import market_read
 from app.models import IngestionRun, Job
 from app.search import SearchFilters, hybrid_search
 
@@ -36,6 +38,18 @@ def get_embedder(request: Request) -> Embedder:
 
 
 EmbedderDep = Annotated[Embedder, Depends(get_embedder)]
+
+
+def get_llm(request: Request) -> StructuredLLM:
+    if getattr(request.app.state, "llm", None) is None:
+        settings = get_settings()
+        if not settings.anthropic_api_key:
+            raise HTTPException(503, "LLM not configured: set JOBPILOT_ANTHROPIC_API_KEY")
+        request.app.state.llm = AnthropicLLM(settings.anthropic_api_key, settings.llm_model)
+    return request.app.state.llm
+
+
+LLMDep = Annotated[StructuredLLM, Depends(get_llm)]
 
 
 class JobHit(BaseModel):
@@ -194,3 +208,38 @@ def stats(session: SessionDep) -> dict:
             for src, active, total in per_source
         ],
     }
+
+
+class SkillDemandOut(BaseModel):
+    skill: str
+    category: str
+    jobs: int
+    required: int
+    share: float
+
+
+class MarketResponse(BaseModel):
+    role: str
+    sample_size: int
+    skills: list[SkillDemandOut]
+
+
+@app.get("/market", response_model=MarketResponse)
+def market(
+    session: SessionDep,
+    embedder: EmbedderDep,
+    llm: LLMDep,
+    role: Annotated[str, Query(min_length=2, max_length=120)],
+    location: str | None = None,
+    remote: bool | None = None,
+    sample: Annotated[int, Query(ge=5, le=60)] = 30,
+) -> MarketResponse:
+    """Skills that live postings for `role` ask for, ranked by how many postings ask."""
+    read = market_read(
+        session, llm, embedder, role, SearchFilters(remote=remote, location=location), sample=sample
+    )
+    return MarketResponse(
+        role=read.role,
+        sample_size=read.sample_size,
+        skills=[SkillDemandOut(**vars(s)) for s in read.skills],
+    )

@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     http_timeout_s: float = 30.0
     user_agent: str = "JobPilot/0.1 (+https://github.com/GaneshPokharkar/jobpilot)"
 
+    # LLM (skill extraction and, later, the agent). Optional so ingestion and search run without it;
+    # endpoints that need it return 503 until it is set.
+    anthropic_api_key: str | None = None
+    llm_model: str = "claude-haiku-5-5"
+
     # Hybrid search tuning.
     search_candidates: int = 100  # candidates taken from each retriever before fusion
     rrf_k: int = 60  # standard reciprocal-rank-fusion constant

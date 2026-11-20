@@ -9,3 +9,4 @@ httpx==0.28.1
 fastembed==0.9.1
 beautifulsoup4==4.15.0
 PyYAML==6.0.3
+anthropic==2.11.0
