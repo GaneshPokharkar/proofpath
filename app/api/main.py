@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_session
 from app.embeddings import Embedder, FastEmbedEmbedder
-from app.llm import LLMError, StructuredLLM, build_llm
+from app.llm import LLMError, StructuredLLM
 from app.market.demand import NeedsKey, cached_market_read
 from app.models import IngestionRun, Job
 from app.search import SearchFilters, hybrid_search
@@ -95,16 +95,20 @@ def _count(session: Session, event: str) -> None:
 
 def get_llm(request: Request) -> StructuredLLM:
     # Bring-your-own-key: a visitor's own Gemini key, sent per request and never stored.
+    # Every model call goes through the router (app/llmops/router.py), which picks the model per
+    # task, falls back between providers and traces each call.
+    from app.llmops.router import build_router
+
     user_key = (request.headers.get("x-gemini-key") or "").strip()
     if user_key:
         if len(user_key) > 200:
             raise HTTPException(400, "That API key doesn't look right")
-        return build_llm("gemini", user_key, get_settings().llm_model)
+        return build_router(get_settings(), user_gemini_key=user_key)
     if getattr(request.app.state, "llm", None) is None:
-        settings = get_settings()
-        if not settings.llm_api_key:
-            raise HTTPException(503, "LLM not configured: set JOBPILOT_LLM_API_KEY")
-        request.app.state.llm = build_llm(settings.llm_provider, settings.llm_api_key, settings.llm_model)
+        router = build_router(get_settings())
+        if router is None:
+            raise HTTPException(503, "LLM not configured: set GROQ_API_KEY or JOBPILOT_LLM_API_KEY")
+        request.app.state.llm = router
     return request.app.state.llm
 
 
@@ -197,6 +201,19 @@ def fields(session: SessionDep) -> dict:
         "fields": [{"key": k, "label": v, "jobs": counts.get(k, 0)} for k, v in FIELD_LABELS.items()],
         "levels": [{"key": k, "label": v, "jobs": levels.get(k, 0)} for k, v in LEVEL_LABELS.items()],
     }
+
+
+@app.get("/stats/llm")
+def llm_stats(session: SessionDep, days: Annotated[int, Query(ge=1, le=30)] = 7) -> dict:
+    """How the AI layer is doing: calls, errors, fallbacks, latency, tokens and cache hit rate per
+    task and provider. Numbers only; no prompts or answers are ever stored."""
+    from app.llmops.trace import summary
+
+    try:
+        with session.begin_nested():
+            return summary(session, days)
+    except Exception:  # noqa: BLE001 - before the llm_calls table exists
+        return {"days": days, "llm_calls": 0, "by_task": []}
 
 
 @app.get("/version")
@@ -529,6 +546,7 @@ def admin_status(session: SessionDep) -> dict:
     return {
         "last_refresh": last,
         "configured": {
+            "groq_key": bool(s.groq_api_key),
             "ai_key": bool(s.llm_api_key),
             "admin_password": bool(s.admin_secret),
             "cron_secret": bool(s.cron_secret),
@@ -559,10 +577,7 @@ async def telegram_webhook(request: Request) -> dict:
         raise HTTPException(401, "Not from Telegram")
     update = await request.json()
 
-    llm = None
-    if s.llm_api_key:
-        llm = getattr(request.app.state, "llm", None) or build_llm(s.llm_provider, s.llm_api_key, s.llm_model)
-        request.app.state.llm = llm
+    llm = get_optional_llm(request)
 
     with session_scope() as session:
         deps = Deps(
@@ -623,14 +638,13 @@ class ChatOut(BaseModel):
 
 
 def get_chat_model(request: Request):
-    """GeminiChat from the visitor's own key, else the server key. 503 when there is neither."""
-    from app.llm import GeminiChat
-
-    s = get_settings()
-    key = (request.headers.get("x-gemini-key") or "").strip() or s.llm_api_key
-    if not key:
-        raise HTTPException(503, "Add your Gemini key to chat")
-    return GeminiChat(key, s.llm_model)
+    """The routed model (it chats as well as extracts). 503 when no provider is configured."""
+    try:
+        return get_llm(request)
+    except HTTPException as exc:
+        if exc.status_code == 503:
+            raise HTTPException(503, "Add your Gemini key to chat") from exc
+        raise
 
 
 @app.post("/chat", response_model=ChatOut)

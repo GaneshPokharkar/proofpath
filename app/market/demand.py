@@ -1,6 +1,7 @@
 """Market read: which skills do live postings for a role actually ask for, and how often."""
 
 import json
+import re
 from dataclasses import dataclass
 
 from sqlalchemy import text
@@ -71,9 +72,80 @@ def market_read(
     return MarketRead(role=role, sample_size=n, job_ids=job_ids, skills=skills)
 
 
+# --- Semantic cache ---------------------------------------------------------------------------
+# A saved report is reused for a role that means the same thing. Two layers, because embeddings
+# alone were measured to be unsafe here (evals/semantic_cache.py): "java developer" vs
+# "javascript developer" scores 0.906, higher than real synonyms like "ml engineer" vs
+# "machine learning engineer" (0.891).
+#   1. canonical_role(): rewrite spellings and abbreviations, so those match exactly.
+#   2. embedding similarity >= SEMANTIC_MIN, and only when the seniority words are the same.
+
+SEMANTIC_MIN = 0.93
+_SPELLINGS = [
+    (r"\bfront[\s-]+end\b", "frontend"),
+    (r"\bback[\s-]+end\b", "backend"),
+    (r"\bfull[\s-]+stack\b", "fullstack"),
+    (r"\bdev[\s-]+ops\b", "devops"),
+    (r"\bml\b", "machine learning"),
+    (r"\bai\b", "artificial intelligence"),
+    (r"\bsde\b", "software development engineer"),
+    (r"\bswe\b", "software engineer"),
+    (r"\breact(?:\.?js)\b", "react"),
+    (r"\bnode(?:\.?js)\b", "node"),
+    (r"\bdevs?\b", "developer"),
+    (r"\bengg?\b", "engineer"),
+    (r"\bengineering\b(?=\s+(intern|internship|trainee))", "engineer"),
+    (r"\binternship\b", "intern"),
+]
+LEVEL_WORDS = {
+    "intern",
+    "trainee",
+    "junior",
+    "senior",
+    "lead",
+    "principal",
+    "staff",
+    "head",
+    "manager",
+    "director",
+    "fresher",
+}
+
+
+def canonical_role(role: str) -> str:
+    r = " ".join(re.sub(r"[^a-z0-9+#. ]+", " ", role.lower()).split())
+    for pattern, repl in _SPELLINGS:
+        r = re.sub(pattern, repl, r)
+    return " ".join(r.split())
+
+
+def _levels(role: str) -> set[str]:
+    return set(role.split()) & LEVEL_WORDS
+
+
+def _scope(filters: SearchFilters, sample: int) -> str:
+    return f"loc={(filters.location or '').lower()}|remote={filters.remote}|india={filters.india}|n={sample}"
+
+
 def _cache_key(role: str, filters: SearchFilters, sample: int) -> str:
-    words = " ".join(role.lower().split())
-    return f"{words}|loc={(filters.location or '').lower()}|remote={filters.remote}|n={sample}"
+    return f"{canonical_role(role)}|{_scope(filters, sample)}"
+
+
+def _semantic_hit(session: Session, embedder: Embedder, role: str, scope: str):
+    vec = embedder.embed_query(role)
+    row = session.execute(
+        text(
+            """
+            SELECT key, role, payload, 1 - (role_vec <=> CAST(:v AS vector)) AS sim FROM market_cache
+            WHERE scope = :s AND role_vec IS NOT NULL AND built_at >= now() - interval '7 days'
+            ORDER BY role_vec <=> CAST(:v AS vector) LIMIT 1
+            """
+        ),
+        {"v": str(vec), "s": scope},
+    ).first()
+    if row is None or row.sim < SEMANTIC_MIN or _levels(canonical_role(row.role)) != _levels(role):
+        return None, vec
+    return row, vec
 
 
 class NeedsKey(LookupError):
@@ -92,7 +164,11 @@ def cached_market_read(
     for 7 days, so a visitor's own API key is spent only by the first person to ask for a role.
 
     Returns (read, from_cache)."""
-    key = _cache_key(role, filters, sample)
+    from app.llmops.trace import CallRecord, timed
+
+    canon = canonical_role(role)
+    key, scope = _cache_key(role, filters, sample), _scope(filters, sample)
+    hit_rec = CallRecord(task="market_report", provider="cache", model="")
     row = session.execute(
         text(
             """
@@ -102,8 +178,14 @@ def cached_market_read(
         ),
         {"k": key},
     ).first()
+    vec = None
+    if row is None:
+        srow, vec = _semantic_hit(session, embedder, canon, scope)
+        if srow is not None:
+            row, key, hit_rec.provider = srow, srow.key, "semantic-cache"
     if row is not None:
-        session.execute(text("UPDATE market_cache SET hits = hits + 1 WHERE key = :k"), {"k": key})
+        with timed(hit_rec):
+            session.execute(text("UPDATE market_cache SET hits = hits + 1 WHERE key = :k"), {"k": key})
         p = row.payload
         return MarketRead(
             p["role"], p["sample_size"], p["job_ids"], [SkillDemand(**s) for s in p["skills"]]
@@ -121,10 +203,18 @@ def cached_market_read(
     session.execute(
         text(
             """
-            INSERT INTO market_cache (key, role, payload, built_at) VALUES (:k, :r, CAST(:p AS jsonb), now())
-            ON CONFLICT (key) DO UPDATE SET payload = EXCLUDED.payload, built_at = now(), role = EXCLUDED.role
+            INSERT INTO market_cache (key, role, payload, built_at, scope, role_vec)
+            VALUES (:k, :r, CAST(:p AS jsonb), now(), :s, CAST(:v AS vector))
+            ON CONFLICT (key) DO UPDATE SET payload = EXCLUDED.payload, built_at = now(),
+                role = EXCLUDED.role, scope = EXCLUDED.scope, role_vec = EXCLUDED.role_vec
             """
         ),
-        {"k": key, "r": role, "p": json.dumps(payload)},
+        {
+            "k": key,
+            "r": canon,
+            "p": json.dumps(payload),
+            "s": scope,
+            "v": str(vec or embedder.embed_query(canon)),
+        },
     )
     return read, False

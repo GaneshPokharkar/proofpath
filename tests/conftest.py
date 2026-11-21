@@ -61,3 +61,11 @@ def session(engine):
 @pytest.fixture
 def embedder():
     return HashingEmbedder()
+
+
+@pytest.fixture(autouse=True)
+def _no_trace_writes(monkeypatch):
+    """LLM traces go to a list in tests, never to whatever database the settings point at."""
+    from app.llmops import trace
+
+    monkeypatch.setattr(trace, "sink", lambda rec: None)

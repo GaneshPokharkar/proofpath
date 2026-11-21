@@ -29,6 +29,12 @@
   </div>
 
   <div class="card">
+    <h2>AI calls, last 7 days</h2>
+    <p id="llm-sum" style="margin:0 0 8px;font-size:15px">Loading…</p>
+    <div style="overflow-x:auto"><table id="llm-table" style="width:100%;border-collapse:collapse;font-size:14px"></table></div>
+  </div>
+
+  <div class="card">
     <h2>Admin password</h2>
     <input type="password" id="pw" placeholder="The value of ADMIN_SECRET" autocomplete="current-password">
   </div>
@@ -48,12 +54,22 @@
   </div>
 </div>
 <script>
-const labels = { ai_key: "AI key (skills and readiness)", admin_password: "Admin password", cron_secret: "Cron secret (optional)",
+const labels = { groq_key: "Groq key (main AI provider)", ai_key: "Gemini key (AI fallback)", admin_password: "Admin password", cron_secret: "Cron secret (optional)",
   telegram_bot: "Telegram bot token", telegram_admins: "Telegram admin usernames", github_token: "GitHub token (optional, more checks per hour)" };
 fetch("/admin/status").then(r => r.json()).then(s => {
   document.getElementById("status").innerHTML =
     `<li>Last refresh: <b>${s.last_refresh ? new Date(s.last_refresh).toLocaleString() : "never"}</b></li>` +
     Object.entries(s.configured).map(([k, v]) => `<li class="${v ? "ok" : "no"}">${v ? "✓" : "○"} ${labels[k] || k}${v ? "" : " (not set yet)"}</li>`).join("");
+});
+fetch("/stats/llm?days=7").then(r => r.json()).then(d => {
+  const pct = x => x == null ? "–" : Math.round(x * 100) + "%";
+  document.getElementById("llm-sum").textContent = d.llm_calls
+    ? `${d.llm_calls} model calls, ${d.errors} errors, ${d.fallbacks} fallbacks, ${d.tokens.toLocaleString()} tokens. Cache answered ${d.cache_hits} requests (${pct(d.cache_hit_rate)}).`
+    : "No AI calls recorded yet.";
+  const th = "padding:6px 8px;text-align:left;border-bottom:1px solid #D5DCEA";
+  const td = "padding:6px 8px;border-bottom:1px solid #EEF1F7";
+  document.getElementById("llm-table").innerHTML = d.by_task.length ? `<tr>${["Task","Provider","Model","Calls","Errors","Fallbacks","p50 ms","p95 ms","Tokens"].map(h => `<th style="${th}">${h}</th>`).join("")}</tr>` +
+    d.by_task.map(r => `<tr>${[r.task, r.provider, r.model, r.calls, r.errors, r.fallbacks, r.p50_ms, r.p95_ms, (r.tokens_in + r.tokens_out).toLocaleString()].map(v => `<td style="${td}">${v}</td>`).join("")}</tr>`).join("") : "";
 });
 async function call(path, out) {
   const el = document.getElementById(out);

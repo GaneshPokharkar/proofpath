@@ -56,9 +56,15 @@ class Settings(BaseSettings):
     github_token: str | None = Field(
         None, validation_alias=AliasChoices("JOBPILOT_GITHUB_TOKEN", "GITHUB_TOKEN")
     )
-    # A refresh within this many hours of the last successful one is skipped unless forced.
+    # Model router (app/llmops/router.py): Groq first when its key is set, Gemini as fallback.
+    groq_api_key: str | None = Field(
+        default=None, validation_alias=AliasChoices("JOBPILOT_GROQ_API_KEY", "GROQ_API_KEY")
+    )
+    groq_model: str = "llama-3.3-70b-versatile"  # chat and heavy extraction
+    groq_fast_model: str = "llama-3.1-8b-instant"  # short, simple extraction
     latex_compile_url: str = "https://latex.ytotech.com/builds/sync"  # Vercel has no TeX
     memory_days: int = 1  # chat memory is deleted after this many days without use
+    # A refresh within this many hours of the last successful one is skipped unless forced.
     refresh_cooldown_hours: float = 6.0
 
     # Hybrid search tuning.

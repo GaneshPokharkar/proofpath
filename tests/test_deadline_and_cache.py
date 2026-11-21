@@ -108,3 +108,34 @@ def test_market_read_served_from_database_for_a_week(session, embedder):
     session.execute(text("UPDATE market_cache SET built_at = now() - interval '8 days'"))
     _, cached4 = cached_market_read(session, llm, embedder, "backend engineer", sample=5)
     assert cached4 is False
+
+
+def test_semantic_cache_reuses_a_report_for_the_same_role(session, embedder, monkeypatch):
+    from app.llmops import trace
+
+    got = []
+    monkeypatch.setattr(trace, "sink", got.append)
+    src = FakeSource()
+    sync_postings(
+        session,
+        src,
+        [posting("b1", "Backend Engineer", "Python, FastAPI and PostgreSQL.")],
+        embedder,
+        datetime.now(UTC),
+        EXPIRE,
+    )
+    llm = FakeLLM()
+    _, c1 = cached_market_read(session, llm, embedder, "Back-End Developer", sample=5)
+    calls = llm.calls
+    _, c2 = cached_market_read(session, llm, embedder, "backend dev", sample=5)  # same canonical role
+    assert (c1, c2) == (False, True) and llm.calls == calls
+    assert got[-1].provider == "cache"
+
+    # A different wording that canonicalises differently: the vector decides, with the same seniority.
+    real = embedder.embed_query
+    stored = real("backend developer")
+    monkeypatch.setattr(embedder, "embed_query", lambda t: stored if "server side" in t else real(t))
+    _, c3 = cached_market_read(session, llm, embedder, "server side developer", sample=5)
+    assert c3 is True and got[-1].provider == "semantic-cache" and llm.calls == calls
+    _, c4 = cached_market_read(session, llm, embedder, "senior server side developer", sample=5)
+    assert c4 is False  # same vector, but "senior" vs none: never shares a report

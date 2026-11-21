@@ -25,6 +25,28 @@ STEP_0009 = [
 ]
 
 
+STEP_0010 = [
+    # One row per LLM call (or cache hit): numbers only, never prompt or answer text.
+    """CREATE TABLE IF NOT EXISTS llm_calls (
+        id BIGSERIAL PRIMARY KEY,
+        at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        task TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        model TEXT NOT NULL DEFAULT '',
+        ms INTEGER NOT NULL DEFAULT 0,
+        tokens_in INTEGER NOT NULL DEFAULT 0,
+        tokens_out INTEGER NOT NULL DEFAULT 0,
+        ok BOOLEAN NOT NULL DEFAULT true,
+        error TEXT NOT NULL DEFAULT '',
+        fallback BOOLEAN NOT NULL DEFAULT false
+    )""",
+    "CREATE INDEX IF NOT EXISTS llm_calls_at ON llm_calls (at)",
+    # Semantic cache: the role's embedding and the filters it was built for (scope).
+    "ALTER TABLE market_cache ADD COLUMN IF NOT EXISTS scope TEXT",
+    "ALTER TABLE market_cache ADD COLUMN IF NOT EXISTS role_vec vector(384)",
+]
+
+
 def ensure_schema(engine) -> list[str]:
     """Bring the live database up to migration 0009. Each step runs in its own transaction and
     only when it is missing, so an existing table never gets locked on a cold start."""
@@ -64,6 +86,16 @@ def ensure_schema(engine) -> list[str]:
             ).scalar(),
             STEP_0009,
         ),
+        (
+            "0010",
+            lambda c: c.execute(
+                text(
+                    "SELECT to_regclass('llm_calls') IS NULL OR NOT EXISTS (SELECT 1 FROM information_schema.columns "
+                    "WHERE table_name = 'market_cache' AND column_name = 'role_vec')"
+                )
+            ).scalar(),
+            STEP_0010,
+        ),
     ]
     for name, needed, sqls in steps:
         with engine.begin() as conn:
@@ -75,7 +107,7 @@ def ensure_schema(engine) -> list[str]:
     with engine.begin() as conn:
         conn.execute(
             text(
-                "UPDATE alembic_version SET version_num = '0009' WHERE version_num IN ('0006', '0007', '0008')"
+                "UPDATE alembic_version SET version_num = '0010' WHERE version_num IN ('0006', '0007', '0008', '0009')"
             )
         )
     return done

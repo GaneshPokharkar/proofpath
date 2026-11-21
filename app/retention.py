@@ -29,6 +29,7 @@ def purge(session: Session, now: datetime | None = None) -> dict[str, int]:
 
     p["memory_cutoff"] = (now or datetime.now(UTC)) - timedelta(days=get_settings().memory_days)
     run("chat_memory", "DELETE FROM agent_sessions WHERE updated_at < :memory_cutoff")
+    run("llm_traces", "DELETE FROM llm_calls WHERE at < now() - interval '30 days'")
     run("telegram_chats", "DELETE FROM telegram_chats WHERE created_at < :cutoff AND NOT alerts_on")
     # Keep the newest successful run: the refresh cooldown and skill-report freshness read it.
     run(

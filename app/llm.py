@@ -108,6 +108,7 @@ class GeminiLLM:
         self._key = api_key
         self._client = client or httpx.Client(timeout=60)
         self._max_retries = max_retries
+        self.last_usage = (0, 0)  # (prompt tokens, output tokens) of the latest call, for tracing
 
     def _post(self, body: dict) -> dict:
         for attempt in range(self._max_retries + 1):
@@ -125,7 +126,10 @@ class GeminiLLM:
                 continue
             if r.status_code != 200:
                 raise LLMError(f"Gemini {r.status_code}: {r.text[:500]}")
-            return r.json()
+            data = r.json()
+            u = data.get("usageMetadata") or {}
+            self.last_usage = (u.get("promptTokenCount", 0), u.get("candidatesTokenCount", 0))
+            return data
         raise AssertionError("unreachable")
 
     def extract(self, system: str, user: str, schema: type[T]) -> T:
