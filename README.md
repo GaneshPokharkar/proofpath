@@ -1,10 +1,26 @@
 # ProofPath
 
-An AI job-search agent. You describe the job you want in plain language; JobPilot searches a live,
-daily-refreshed index of real job postings and explains why each one fits.
+**Live demo: [proofpath-iota.vercel.app](https://proofpath-iota.vercel.app)** · Python · FastAPI ·
+PostgreSQL + pgvector · LLM agent with tool calling · CI/CD on GitHub Actions · Vercel + Neon
 
-> **Live:** student web app (find jobs, skills a role needs, resume check with project ideas,
-> GitHub readiness), daily refresh, and a Telegram bot, on Vercel + Neon free tiers.
+A full-stack AI job-search app for students in India. Search live, de-duplicated job postings,
+upload a resume to see a match score on every job and exactly what to change to reach 100%, ask an
+assistant in plain words ("python internships in Pune, save the first one"), and get a tailored,
+fact-checked one-page resume PDF for a specific job.
+
+## What to look at (5 minutes)
+
+| Area | Where | What it shows |
+|---|---|---|
+| Backend and API | `app/api/main.py`, `app/search.py` | REST API, hybrid search (full-text + vectors, reciprocal rank fusion) |
+| Data pipeline | `app/ingest/` | Daily ingestion from Greenhouse, Lever, Ashby; cleaning, de-duplication, deadlines |
+| LLM agent | `app/agent/` | Function calling over 6 tools, two-layer memory, hallucination guard |
+| Resume engine | `app/resume/` | Structured extraction, per-job scoring, rewrite + verifier, LaTeX PDF |
+| LLMOps | `app/llmops/` | Model router with fallback, per-call tracing, semantic cache |
+| Quality | `tests/`, `evals/`, `.github/workflows/` | Automated tests on real Postgres, 100-case agent evals, CI/CD with smoke tests |
+| Design notes | `docs/ARCHITECTURE.md`, `docs/learn/` | Architecture, pipeline, and the reasoning behind each design choice |
+
+Run locally: `make setup db run` (Docker for Postgres), then `make check` runs what CI runs.
 
 ## Architecture: fetch once, serve many
 
