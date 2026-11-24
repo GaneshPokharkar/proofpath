@@ -1,0 +1,5 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Applied jobs (demo)</title>
+<style>body{font:15px system-ui,sans-serif;background:#F3F2EF;margin:0}main{max-width:900px;margin:24px auto;background:#fff;border:1px solid #ddd;border-radius:8px;padding:20px}
+table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #eee;text-align:left;font-size:14px}h1{font-size:22px}</style></head>
+<body><main><h1>Applied jobs (demo board)</h1><table id=t></table><p><a href="index.html">Back to jobs</a></p></main>
+<script>const a=JSON.parse(localStorage.getItem('applied')||'{}');document.getElementById('t').innerHTML='<tr><th>Role</th><th>Company</th><th>When</th><th>Resume</th></tr>'+Object.values(a).map(x=>`<tr><td>${x.title}</td><td>${x.company}</td><td>${x.at}</td><td>${x.answers['Resume (PDF)']||''}</td></tr>`).join('')</script></body></html>

@@ -221,3 +221,17 @@ def test_fill_form_fills_known_fields_and_never_consents_or_submits(tmp_path):
     finally:
         browser.close()
         pw.stop()
+
+
+def test_demo_pipeline_applies_only_to_good_fits(tmp_path):
+    from applier.demo import run
+
+    pdf = tmp_path / "Asha_Kumar_Resume.pdf"
+    pdf.write_bytes(b"%PDF-1.4 test")
+    pw, browser = _browser()  # skip when no browser is available
+    browser.close()
+    pw.stop()
+    log = {row["company"]: row["status"] for row in run(PROFILE, pdf, video=None)}
+    assert log["Tandem Health"] == "submitted"  # React, Node.js, JavaScript: in the profile
+    assert log["Pebble Apps"] == "skipped (low fit)"  # Swift: not in the profile
+    assert log["Granite Bank"] == "skipped (senior)"

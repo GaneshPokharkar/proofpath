@@ -25,3 +25,15 @@ python -m applier run --profile applier/profiles/me.yaml --job https://company.c
    is still required, waits for you, and logs the application in `applier/out/applications.csv`.
 
 Every model call is traced to `applier/out/llm_calls.jsonl` (task, provider, latency, tokens).
+
+## Demo: how background auto-apply tools work (mock board only)
+
+```bash
+python -m applier.demo --profile applier/profiles/me.yaml --resume me.pdf --video applier/out/demo.mp4 [--show]
+```
+
+Runs a fully autonomous agent against `applier/demo_site`, a local job board with fictional jobs:
+discover jobs → score fit from skills (skip poor fits and senior roles) → drive the multi-page
+Easy Apply form → answer screening questions from the answer bank and true profile facts → submit →
+log to the tracker. It records the run as a video. It never targets real sites; on real boards the
+platform terms forbid bots, so `python -m applier apply` stops before Submit instead.

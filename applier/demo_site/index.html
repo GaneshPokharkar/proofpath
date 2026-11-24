@@ -1,0 +1,57 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>JobBoard Demo (fictional)</title>
+<style>
+ body{margin:0;font:15px/1.45 system-ui,Segoe UI,sans-serif;background:#F3F2EF;color:#1d2226}
+ header{background:#fff;border-bottom:1px solid #ddd;padding:10px 24px;display:flex;gap:16px;align-items:center}
+ .logo{background:#14213D;color:#FFE066;font-weight:800;border-radius:6px;padding:2px 7px}
+ .banner{background:#FFF4CE;padding:6px 24px;font-size:13px;border-bottom:1px solid #EBD99A}
+ main{display:grid;grid-template-columns:380px 1fr;gap:16px;max-width:1100px;margin:16px auto;padding:0 16px}
+ .list,.detail{background:#fff;border:1px solid #ddd;border-radius:8px}
+ .job{padding:12px 16px;border-bottom:1px solid #eee;cursor:pointer}.job.sel{background:#E8F1FB}
+ .job h3{margin:0;color:#0A66C2;font-size:16px}.muted{color:#666;font-size:13px}
+ .detail{padding:20px}.btn{background:#0A66C2;color:#fff;border:0;border-radius:20px;padding:8px 18px;font-weight:600;cursor:pointer}
+ .btn.ghost{background:#fff;color:#0A66C2;border:1px solid #0A66C2}.applied{color:#057642;font-weight:700}
+ .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center}
+ .modal.open{display:flex}.box{background:#fff;border-radius:10px;width:560px;max-height:85vh;overflow:auto;padding:20px}
+ .bar{height:6px;background:#eee;border-radius:3px;margin:8px 0 16px}.bar i{display:block;height:6px;background:#0A66C2;border-radius:3px}
+ label{display:block;margin:10px 0 4px;font-weight:600;font-size:14px} input,select,textarea{width:100%;box-sizing:border-box;padding:8px;border:1px solid #888;border-radius:4px;font:inherit}
+ .row{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.err{color:#B42318;font-size:13px}
+ .pill{display:inline-block;background:#eef3f8;border-radius:12px;padding:2px 8px;margin:2px;font-size:12px}
+</style></head><body>
+<header><span class="logo">JB</span><b>JobBoard</b><span class="muted">Demo site with fictional jobs, for showing how auto-apply tools work</span><span style="margin-left:auto"><a href="tracker.html">Applied jobs</a></span></header>
+<div class="banner">This is a mock job board. No real company or account is involved.</div>
+<main><section class="list" id="list"></section><section class="detail" id="detail"></section></main>
+<div class="modal" id="modal"><div class="box" id="box"></div></div>
+<script src="jobs.js"></script>
+<script>
+const $=id=>document.getElementById(id), applied=JSON.parse(localStorage.getItem('applied')||'{}');
+const STEPS=['Contact info','Resume','Additional questions','Review'];
+let job=null, step=0, data={};
+function list(){ $('list').innerHTML=JOBS.map(j=>`<div class="job ${job&&job.id===j.id?'sel':''}" data-job="${j.id}"><h3>${j.title}</h3><div>${j.company}</div><div class="muted">${j.place} · ${j.posted} ${applied[j.id]?'· <span class=applied>Applied</span>':'· Easy Apply'}</div></div>`).join('');
+  document.querySelectorAll('.job').forEach(e=>e.onclick=()=>show(+e.dataset.job)); }
+function show(id){ job=JOBS.find(j=>j.id===id); list();
+  $('detail').innerHTML=`<h2 id="job-title">${job.title}</h2><div>${job.company} · ${job.place}</div><p class="muted">${job.posted}</p>
+   ${applied[id]?'<p class="applied">Applied</p>':'<button class="btn" id="easy-apply">Easy Apply</button>'}
+   <h3>About the job</h3><p id="job-text">${job.text}</p><div>${job.skills.map(s=>`<span class=pill>${s}</span>`).join('')}</div>`;
+  if($('easy-apply')) $('easy-apply').onclick=()=>{step=0;data={};render();$('modal').classList.add('open')}; }
+function field(id,label,html){return `<label for="${id}">${label}</label>${html}`}
+function render(){ const pct=Math.round((step+1)/STEPS.length*100); let body='';
+  if(step===0) body=field('fn','First name*','<input id=fn>')+field('ln','Last name*','<input id=ln>')+field('em','Email address*','<input id=em type=email>')+field('ph','Mobile phone number*','<input id=ph>');
+  if(step===1) body=field('cv','Resume* (PDF)','<input id=cv type=file accept=".pdf">');
+  if(step===2) body=field('np','What is your notice period?*','<select id=np><option value="">Select an option</option><option>Immediately available</option><option>15 days</option><option>30 days</option><option>60 days</option></select>')
+     +field('py',`How many years of experience do you have with ${job.skills[0]}?*`,'<input id=py inputmode=numeric>')
+     +field('rl','Are you comfortable working on-site in '+job.place.split(' ')[0]+'?*','<select id=rl><option value="">Select an option</option><option>Yes</option><option>No</option></select>')
+     +field('st','Expected stipend (per month)*','<input id=st>')
+     +field('why','Why are you a good fit for this role? (2-3 sentences)*','<textarea id=why rows=3></textarea>');
+  if(step===3) body='<p>Check your answers. The employer will also receive your profile.</p><pre style="white-space:pre-wrap;background:#f7f7f7;padding:10px;border-radius:6px">'+Object.entries(data).map(([k,v])=>k+': '+v).join('\n')+'</pre>';
+  $('box').innerHTML=`<h3 style="margin:0">Apply to ${job.company}</h3><div class=muted>${STEPS[step]} · ${step+1}/${STEPS.length}</div><div class=bar><i style="width:${pct}%"></i></div>${body}<div id=err class=err></div>
+   <div class=row><button class="btn ghost" id=close>Close</button>${step<3?'<button class=btn id=next aria-label="Continue to next step">Next</button>':'<button class=btn id=submit>Submit application</button>'}</div>`;
+  $('close').onclick=()=>$('modal').classList.remove('open');
+  if($('next')) $('next').onclick=next; if($('submit')) $('submit').onclick=submit; }
+function next(){ const req=[...$('box').querySelectorAll('input,select,textarea')]; const miss=req.filter(e=>e.type==='file'?!e.files.length:!e.value.trim());
+  if(miss.length){ $('err').textContent='Please answer every required question.'; return; }
+  req.forEach(e=>data[(e.labels[0]?.innerText||e.id).replace('*','')]=e.type==='file'?e.files[0].name:e.value); step++; render(); }
+function submit(){ applied[job.id]={company:job.company,title:job.title,at:new Date().toLocaleString(),answers:data}; localStorage.setItem('applied',JSON.stringify(applied));
+  $('box').innerHTML=`<h3 class=applied id=done>Application submitted</h3><p>Your application was sent to ${job.company}.</p><div class=row><button class=btn id=close>Done</button></div>`;
+  $('close').onclick=()=>{$('modal').classList.remove('open');show(job.id)}; }
+list(); show(JOBS[0].id);
+</script></body></html>
