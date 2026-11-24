@@ -1,0 +1,58 @@
+# Copy to applier/profiles/<you>.yaml (not committed) and replace with your own TRUE facts.
+# facts = everything true about a project; bullets = your best default wording.
+contact:
+  name: Asha Kumar
+  email: asha@example.com
+  phone: +91 9000000000
+  city: Pune
+  state: Maharashtra
+  country: India
+  postal_code: '411001'
+  linkedin: ''
+  github: https://github.com/asha-example
+summary_facts:
+- B.Tech CSE student at Example Institute, graduating 2027
+- Builds and deploys web apps
+education:
+- degree: B.Tech CSE
+  institution: Example Institute
+  score: 8.5 / 10
+  year: '2027'
+  current: true
+projects:
+- id: shop
+  title: ShopKart -- E-commerce site
+  tech:
+  - React
+  - Node.js
+  - MongoDB
+  date: '2025'
+  links:
+    Code: https://github.com/asha-example/shopkart
+  facts:
+  - Built a shopping site with React and Node.js
+  - Wrote unit tests with Jest
+  bullets:
+  - Built a shopping site with React and Node.js, with cart, checkout and order history.
+  - Wrote unit tests with Jest for the cart and checkout logic.
+experience: []
+skills:
+  Languages:
+  - Python
+  - JavaScript
+  Tools:
+  - React
+  - Node.js
+  - Git
+coursework:
+- Data Structures and Algorithms
+achievements: []
+answers:
+  how_heard: Job Board
+  notice_period: Immediate
+  available_from: ''
+  internship_duration: ''
+  willing_to_relocate: ''
+  work_authorization: ''
+  extra:
+    Years of experience: '0'

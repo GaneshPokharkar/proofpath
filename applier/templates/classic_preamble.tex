@@ -1,0 +1,38 @@
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[kerning=false]{microtype} % plain word spacing so ATS text extraction reads words whole
+\input{glyphtounicode}
+\pdfgentounicode=1
+\usepackage[a4paper,top=0.45in,bottom=0.4in,left=0.45in,right=0.45in]{geometry}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\hypersetup{pdftitle={<<TITLE>>},pdfauthor={<<NAME>>},
+  pdfsubject={<<ROLE>>},pdfkeywords={<<KEYWORDS>>}}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage[dvipsnames]{xcolor}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\raggedright
+\raggedbottom
+
+% Section headings: small caps + full-width rule (as in the original)
+\titleformat{\section}{\vspace{-5pt}\raggedright\large\bfseries}{}{0em}{}[\vspace{-6pt}\rule{\textwidth}{0.6pt}\vspace{-4pt}]
+\titlespacing*{\section}{0pt}{5pt}{1pt}
+
+% Entry: bold title + right-aligned date, italic subtitle below
+\newcommand{\entry}[3]{%
+  \textbf{#1} \hfill {\small\textit{#2}}\\[-1pt]
+  {\small\textit{#3}}\vspace{-3pt}}
+
+% En-dash bullet list, tight spacing
+\newenvironment{points}{%
+  \begin{itemize}[label=--,leftmargin=14pt,topsep=1pt,itemsep=0pt,parsep=0pt]\small}%
+  {\end{itemize}\vspace{1pt}}
+
+\begin{document}
+

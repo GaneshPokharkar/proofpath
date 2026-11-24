@@ -6,3 +6,9 @@ __pycache__/
 .env
 *.log
 evals/report.json
+
+# Applier: personal profiles and generated applications stay on your computer
+applier/profiles/*
+!applier/profiles/example.yaml
+applier/out/
+applier/.browser/
